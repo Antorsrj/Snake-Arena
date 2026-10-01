@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEUROSNAKE // ICE://DAEMON</title>
+<style>
+/* ============================================================================
+   NEUROSNAKE — a cyberpunk / Matrix-styled Snake game.
+   All styling is embedded here. Palette: neon green / cyan / magenta on black.
+   ========================================================================== */
+
+:root {
+  --bg:        #04070a;   /* deep void background                          */
+  --green:     #00ff9d;   /* primary neon                                  */
+  --cyan:      #00e5ff;   /* secondary accent                              */
+  --magenta:   #ff2f9e;   /* danger / food accent                          */
+  --text:      #b8ffe2;   /* terminal text                                 */
+  --font:      'Courier New', Consolas, 'Liberation Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+/* ----------------------------------------------------------------------------
+   Layer 1 — Matrix digital rain (full-window canvas, behind everything)
+   ------------------------------------------------------------------------ */
+#rain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+/* ----------------------------------------------------------------------------
+   Layer 2 — CRT scanlines + vignette + subtle flicker overlay
+   ------------------------------------------------------------------------ */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.22) 0px,
+    rgba(0, 0, 0, 0.22) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: flicker 4s infinite;
+}
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+              transparent 55%,
+              rgba(0, 0, 0, 0.55) 100%);
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92%      { opacity: 1; }
+  93%      { opacity: 0.82; }
+  94%      { opacity: 1; }
+  97%      { opacity: 0.9; }
+}
+
+/* ----------------------------------------------------------------------------
+   Layer 3 — Game frame (header / stage / footer)
+   ------------------------------------------------------------------------ */
+.frame {
+  position: relative;
+  z-index: 10;
+  width: min(940px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* --- Header: glitchy title + HUD stats ---------------------------------- */
+header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.glitch {
+  position: relative;
+  font-size: clamp(22px, 4vw, 38px);
+  font-weight: bold;
+  letter-spacing: 5px;
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(0, 255, 157, 0.6), 0 0 32px rgba(0, 255, 157, 0.25);
+}
+/* Two offset clones of the text, clipped to thin bands, jittering — the
+   classic chromatic-aberration glitch effect. */
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  overflow: hidden;
+}
+.glitch::before {
+  color: var(--cyan);
+  clip-path: inset(0 0 72% 0);
+  animation: glitch-a 3.1s infinite steps(1);
+}
+.glitch::after {
+  color: var(--magenta);
+  clip-path: inset(66% 0 0 0);
+  animation: glitch-b 2.6s infinite steps(1);
+}
+@keyframes glitch-a {
+  0%, 88%, 100% { transform: translate(0, 0); opacity: 0; }
+  90% { transform: translate(-3px, -1px); opacity: 0.9; }
+  92% { transform: translate(2px, 1px);   opacity: 0.7; }
+  94% { transform: translate(-2px, 0);    opacity: 0.9; }
+}
+@keyframes glitch-b {
+  0%, 84%, 100% { transform: translate(0, 0); opacity: 0; }
+  86% { transform: translate(3px, 1px);  opacity: 0.8; }
+  88% { transform: translate(-2px, -1px); opacity: 0.6; }
+  90% { transform: translate(2px, 0);    opacity: 0.8; }
+}
+
+.subtitle {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: rgba(0, 229, 255, 0.65);
+  text-transform: uppercase;
+}
+
+.hud { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat {
+  border: 1px solid rgba(0, 255, 157, 0.3);
+  background: rgba(0, 22, 14, 0.55);
+  padding: 6px 14px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(0, 255, 157, 0.08), inset 0 0 12px rgba(0, 255, 157, 0.05);
+}
+.stat b {
+  color: var(--green);
+  text-shadow: 0 0 8px rgba(0, 255, 157, 0.8);
+  font-size: 16px;
+}
+.stat.hi b  { color: var(--cyan);    text-shadow: 0 0 8px rgba(0, 229, 255, 0.8); }
+.stat.lvl b { color: var(--magenta); text-shadow: 0 0 8px rgba(255, 47, 158, 0.8); }
+
+/* --- Stage: the game board ------------------------------------------------ */
+#stage {
+  position: relative;
+  aspect-ratio: 28 / 20;               /* matches GRID_W / GRID_H in JS     */
+  border: 1px solid rgba(0, 255, 157, 0.4);
+  background: rgba(2, 10, 8, 0.72);    /* semi-transparent: rain glows thru */
+  box-shadow:
+    0 0 26px rgba(0, 255, 157, 0.14),
+    0 0 60px rgba(0, 255, 157, 0.06),
+    inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+/* Decorative corner brackets, like a targeting reticle. */
+#stage::before, #stage::after {
+  content: '';
+  position: absolute;
+  width: 22px; height: 22px;
+  pointer-events: none;
+}
+#stage::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid var(--cyan);
+  border-left: 2px solid var(--cyan);
+  box-shadow: -2px -2px 10px rgba(0, 229, 255, 0.4);
+}
+#stage::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid var(--magenta);
+  border-right: 2px solid var(--magenta);
+  box-shadow: 2px 2px 10px rgba(255, 47, 158, 0.4);
+}
+#game {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Death screen-shake. */
+#stage.dead { animation: shake 0.45s steps(2) 1; }
+@keyframes shake {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-5px, 3px); }
+  50%  { transform: translate(4px, -4px); }
+  75%  { transform: translate(-3px, -2px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* --- Overlay: start / pause / game-over panels ---------------------------- */
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 8, 0.8);
+  backdrop-filter: blur(2px);
+}
+#overlay.hidden { display: none; }
+
+.panel {
+  text-align: center;
+  padding: 28px 34px;
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  background: rgba(0, 14, 10, 0.6);
+  box-shadow: 0 0 30px rgba(0, 255, 157, 0.12);
+  max-width: 90%;
+}
+.panel h2 { font-size: clamp(20px, 3.4vw, 30px); letter-spacing: 4px; margin-bottom: 14px; }
+.panel h2.red { color: var(--magenta); text-shadow: 0 0 12px rgba(255, 47, 158, 0.7); }
+.panel p {
+  font-size: 13px;
+  line-height: 1.9;
+  letter-spacing: 1px;
+  color: rgba(184, 255, 226, 0.8);
+  margin-bottom: 18px;
+}
+.panel .keys { color: var(--cyan); }
+.panel .final {
+  font-size: 15px;
+  letter-spacing: 2px;
+  margin-bottom: 18px;
+}
+.panel .final b { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 157, 0.8); }
+.record {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 4px 12px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--bg);
+  background: var(--cyan);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.6);
+  animation: pulse 1s infinite alternate;
+}
+@keyframes pulse { from { opacity: 0.7; } to { opacity: 1; } }
+
+.btn {
+  font-family: var(--font);
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--green);
+  background: rgba(0, 255, 157, 0.06);
+  border: 1px solid var(--green);
+  padding: 10px 26px;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(0, 255, 157, 0.7);
+  box-shadow: 0 0 14px rgba(0, 255, 157, 0.25), inset 0 0 14px rgba(0, 255, 157, 0.08);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.btn:hover {
+  background: rgba(0, 255, 157, 0.18);
+  box-shadow: 0 0 26px rgba(0, 255, 157, 0.5), inset 0 0 20px rgba(0, 255, 157, 0.15);
+}
+
+/* --- Footer: control hints ------------------------------------------------ */
+footer {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: rgba(184, 255, 226, 0.5);
+  text-align: center;
+}
+footer .keys { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<!-- Layer 1: Matrix digital rain -->
+<canvas id="rain"></canvas>
+
+<!-- Layer 2: CRT atmosphere -->
+<div class="vignette"></div>
+<div class="scanlines"></div>
+
+<!-- Layer 3: the game -->
+<main class="frame">
+  <header>
+    <div>
+      <div class="glitch" data-text="NEUROSNAKE">NEUROSNAKE</div>
+      <div class="subtitle">// ice protocol v2.077 — daemon running</div>
+    </div>
+    <div class="hud">
+      <div class="stat">score <b id="score">0</b></div>
+      <div class="stat hi">hi-score <b id="hiscore">0</b></div>
+      <div class="stat lvl">speed <b id="level">1</b></div>
+    </div>
+  </header>
+
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay"></div>
+  </div>
+
+  <footer>
+    <span class="keys">ARROWS / WASD</span> steer &nbsp;·&nbsp;
+    <span class="keys">SPACE</span> pause &nbsp;·&nbsp;
+    <span class="keys">ENTER</span> jack in / reboot
+  </footer>
+</main>
+
+<script>
+/* ============================================================================
+   NEUROSNAKE — game logic.
+   Structure:
+     1. Matrix rain background renderer
+     2. Game state + constants
+     3. Input handling (Arrows + WASD, buffered to prevent 180° turns)
+     4. Simulation tick (grid step) + difficulty ramp
+     5. Renderer (smooth interpolated movement, neon glow)
+     6. Overlays (start / pause / game over) + localStorage high score
+     7. Tiny WebAudio blips (no external assets)
+   ========================================================================== */
+(() => {
+'use strict';
+
+/* ---------------------------------------------------------------- helpers */
+const $ = (id) => document.getElementById(id);
+const rand = (n) => Math.floor(Math.random() * n);
+
+const rainCanvas = $('rain');
+const gameCanvas = $('game');
+const stage      = $('stage');
+const overlay    = $('overlay');
+const scoreEl    = $('score');
+const hiscoreEl  = $('hiscore');
+const levelEl    = $('level');
+
+/* ============================================================
+   1. MATRIX DIGITAL RAIN
+   Classic falling-katakana effect: each column drops a character
+   per frame; a translucent black wash each frame leaves fading trails.
+   ============================================================ */
+const rctx = rainCanvas.getContext('2d');
+const RAIN_CHARS = 'アカサタナハマヤラワガザダバパヲ0123456789ABCDEF<>[]{}/\\|=+-*#%$&';
+const RAIN_FONT = 15;
+let rainCols = [];          // per-column drop position (in rows)
+let rainW = 0, rainH = 0;
+
+function sizeRain() {
+  const dpr = window.devicePixelRatio || 1;
+  rainW = window.innerWidth;
+  rainH = window.innerHeight;
+  rainCanvas.width  = rainW * dpr;
+  rainCanvas.height = rainH * dpr;
+  rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  rainCols = new Array(Math.ceil(rainW / RAIN_FONT)).fill(0).map(() => rand(40));
+  rctx.fillStyle = '#04070a';
+  rctx.fillRect(0, 0, rainW, rainH);
+}
+
+function drawRain() {
+  // Fade previous frame slightly -> glowing trails.
+  rctx.fillStyle = 'rgba(4, 7, 10, 0.07)';
+  rctx.fillRect(0, 0, rainW, rainH);
+  rctx.font = RAIN_FONT + 'px monospace';
+
+  for (let i = 0; i < rainCols.length; i++) {
+    const ch = RAIN_CHARS[rand(RAIN_CHARS.length)];
+    const x = i * RAIN_FONT;
+    const y = rainCols[i] * RAIN_FONT;
+
+    // Leading glyph is bright (sometimes near-white), trail is dimmer.
+    const bright = Math.random() < 0.12;
+    rctx.fillStyle = bright
+      ? 'rgba(210, 255, 235, 0.95)'
+      : 'rgba(0, 255, 157, 0.55)';
+    rctx.fillText(ch, x, y);
+
+    rainCols[i]++;
+    // Reset column past the bottom, with random delay so columns desync.
+    if (y > rainH && Math.random() > 0.975) rainCols[i] = 0;
+  }
+}
+
+/* ============================================================
+   2. GAME STATE
+   ============================================================ */
+const GRID_W = 28, GRID_H = 20;      // logical board size (cells)
+const BASE_STEP = 130;               // ms per grid step at level 1
+const MIN_STEP  = 62;                // fastest possible step
+const STEP_GAIN = 4;                 // ms shaved off per food eaten
+
+let cell = 20;                       // cell size in CSS px (set on resize)
+let gctx = gameCanvas.getContext('2d');
+
+let state = 'ready';                 // 'ready' | 'playing' | 'paused' | 'over'
+let snake, prev;                     // current + previous cell positions
+let dir, dirQueue;                   // current direction + buffered inputs
+let food;                            // {x, y}
+let score, foods, highScore;
+let stepInterval, accumulator, lastTime;
+
+/* High score persistence (guarded: localStorage can be unavailable). */
+try { highScore = parseInt(localStorage.getItem('neurosnake.hi'), 10) || 0; }
+catch (e) { highScore = 0; }
+function saveHigh() {
+  try { localStorage.setItem('neurosnake.hi', String(highScore)); } catch (e) {}
+}
+
+function resetGame() {
+  const cy = Math.floor(GRID_H / 2);
+  const cx = Math.floor(GRID_W / 2);
+  snake = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+  prev  = snake.map((s) => ({ x: s.x, y: s.y }));
+  dir   = { x: 1, y: 0 };
+  dirQueue = [];
+  score = 0;
+  foods = 0;
+  stepInterval = BASE_STEP;
+  accumulator = 0;
+  spawnFood();
+  updateHud();
+}
+
+/* Place food on a random cell not currently occupied by the snake. */
+function spawnFood() {
+  const free = [];
+  for (let x = 0; x < GRID_W; x++)
+    for (let y = 0; y < GRID_H; y++)
+      if (!snake.some((s) => s.x === x && s.y === y)) free.push({ x, y });
+  if (free.length === 0) { winGame(); return; }   // board full — perfect run
+  food = free[rand(free.length)];
+}
+
+/* ============================================================
+   3. INPUT — Arrows + WASD, buffered so two quick presses within
+   one tick can't fold the snake back into itself.
+   ============================================================ */
+const KEY_DIRS = {
+  ArrowUp:    [0, -1], w: [0, -1], W: [0, -1],
+  ArrowDown:  [0,  1], s: [0,  1], S: [0,  1],
+  ArrowLeft:  [-1, 0], a: [-1, 0], A: [-1, 0],
+  ArrowRight: [1,  0], d: [1,  0], D: [1,  0],
+};
+
+function queueDir(nx, ny) {
+  const last = dirQueue.length ? dirQueue[dirQueue.length - 1] : dir;
+  if (nx === -last.x && ny === -last.y) return;   // ignore 180° reversal
+  if (nx === last.x  && ny === last.y)  return;   // ignore duplicate
+  if (dirQueue.length < 3) dirQueue.push({ x: nx, y: ny });
+}
+
+document.addEventListener('keydown', (e) => {
+  const key = e.key;
+
+  if (KEY_DIRS[key]) {
+    e.preventDefault();
+    if (state === 'ready' || state === 'over') { startGame(); }
+    if (state === 'playing') queueDir(KEY_DIRS[key][0], KEY_DIRS[key][1]);
+    return;
+  }
+
+  if (key === ' ') {                       // SPACE — pause / resume
+    e.preventDefault();
+    if (state === 'playing') pauseGame();
+    else if (state === 'paused') resumeGame();
+    return;
+  }
+
+  if (key === 'Enter') {                   // ENTER — jack in / reboot
+    e.preventDefault();
+    if (state === 'ready' || state === 'over' || state === 'paused') startGame();
+  }
+});
+
+/* Auto-pause when the browser tab loses focus. */
+window.addEventListener('blur', () => { if (state === 'playing') pauseGame(); });
+
+/* ============================================================
+   4. SIMULATION — one grid step
+   ============================================================ */
+function tick() {
+  if (dirQueue.length) dir = dirQueue.shift();
+
+  const head = snake[0];
+  const nx = head.x + dir.x;
+  const ny = head.y + dir.y;
+
+  // Wall collision = death.
+  if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) return gameOver();
+
+  const eating = (nx === food.x && ny === food.y);
+
+  // Self collision. When not eating, the tail vacates its cell this tick,
+  // so moving into the current tail cell is legal (classic Snake rule).
+  const body = eating ? snake : snake.slice(0, -1);
+  if (body.some((s) => s.x === nx && s.y === ny)) return gameOver();
+
+  // Remember where every segment was, for smooth interpolation.
+  prev = snake.map((s) => ({ x: s.x, y: s.y }));
+  snake.unshift({ x: nx, y: ny });
+
+  if (eating) {
+    foods++;
+    score += 10 * foods;                                   // level multiplier
+    stepInterval = Math.max(MIN_STEP, BASE_STEP - foods * STEP_GAIN); // ramp
+    blip(660, 0.06, 'square');
+    spawnFood();
+  } else {
+    snake.pop();
+  }
+  updateHud();
+}
+
+/* ============================================================
+   5. RENDERER — positions are interpolated between the previous
+   and current grid cells so movement looks smooth, not steppy.
+   ============================================================ */
+function render(t, now) {
+  const w = gameCanvas.clientWidth;
+  const h = gameCanvas.clientHeight;
+  gctx.clearRect(0, 0, w, h);
+
+  /* --- faint grid ------------------------------------------------------- */
+  gctx.strokeStyle = 'rgba(0, 255, 157, 0.06)';
+  gctx.lineWidth = 1;
+  gctx.beginPath();
+  for (let x = 1; x < GRID_W; x++) { gctx.moveTo(x * cell, 0); gctx.lineTo(x * cell, h); }
+  for (let y = 1; y < GRID_H; y++) { gctx.moveTo(0, y * cell); gctx.lineTo(w, y * cell); }
+  gctx.stroke();
+
+  /* --- food: pulsing magenta data-packet with a rotating ring ----------- */
+  if (food) {
+    const fx = (food.x + 0.5) * cell;
+    const fy = (food.y + 0.5) * cell;
+    const pulse = 1 + 0.18 * Math.sin(now / 180);
+
+    gctx.save();
+    gctx.translate(fx, fy);
+    gctx.rotate(now / 600);
+    gctx.strokeStyle = 'rgba(0, 229, 255, 0.7)';
+    gctx.lineWidth = 1.5;
+    const r = cell * 0.42 * pulse;
+    gctx.strokeRect(-r, -r, r * 2, r * 2);          // rotating square ring
+    gctx.restore();
+
+    gctx.save();
+    gctx.shadowColor = 'rgba(255, 47, 158, 0.9)';
+    gctx.shadowBlur = cell * 0.9;
+    gctx.fillStyle = '#ff2f9e';
+    gctx.beginPath();
+    gctx.arc(fx, fy, cell * 0.26 * pulse, 0, Math.PI * 2);
+    gctx.fill();
+    gctx.fillStyle = 'rgba(255, 220, 240, 0.9)';
+    gctx.beginPath();
+    gctx.arc(fx, fy, cell * 0.1 * pulse, 0, Math.PI * 2);
+    gctx.fill();
+    gctx.restore();
+  }
+
+  /* --- snake: interpolate prev -> current, draw tail-to-head ------------ */
+  const pts = snake.map((s, i) => {
+    // New tail segment (growth) starts at the old tail position.
+    const p = prev[i] || prev[prev.length - 1];
+    return {
+      x: (p.x + (s.x - p.x) * t + 0.5) * cell,
+      y: (p.y + (s.y - p.y) * t + 0.5) * cell,
+    };
+  });
+
+  gctx.lineCap = 'round';
+  gctx.lineJoin = 'round';
+  for (let i = pts.length - 1; i > 0; i--) {
+    const f = i / pts.length;                        // 0 = head … 1 = tail
+    // Color fades neon-green -> deep green along the body.
+    gctx.strokeStyle = `hsla(${152 - f * 28}, 100%, ${60 - f * 22}%, ${1 - f * 0.4})`;
+    gctx.lineWidth = cell * (0.78 - f * 0.22);
+    gctx.shadowColor = 'rgba(0, 255, 157, 0.8)';
+    gctx.shadowBlur = cell * 0.55 * (1 - f);
+    gctx.beginPath();
+    gctx.moveTo(pts[i].x, pts[i].y);
+    gctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+    gctx.stroke();
+  }
+
+  /* --- head: bright core + glowing outline + eyes ------------------------ */
+  const headPt = pts[0];
+  gctx.save();
+  gctx.shadowColor = 'rgba(0, 255, 157, 1)';
+  gctx.shadowBlur = cell;
+  gctx.fillStyle = '#7dffc9';
+  gctx.beginPath();
+  gctx.arc(headPt.x, headPt.y, cell * 0.42, 0, Math.PI * 2);
+  gctx.fill();
+  gctx.restore();
+
+  // Eyes offset perpendicular to travel direction.
+  const px = -dir.y, py = dir.x;                     // perpendicular vector
+  const eo = cell * 0.18, ef = cell * 0.16;         // eye offset / forward
+  gctx.fillStyle = '#04070a';
+  for (const sgn of [1, -1]) {
+    gctx.beginPath();
+    gctx.arc(headPt.x + px * eo * sgn + dir.x * ef,
+             headPt.y + py * eo * sgn + dir.y * ef,
+             cell * 0.08, 0, Math.PI * 2);
+    gctx.fill();
+  }
+}
+
+/* ============================================================
+   6. OVERLAYS + HUD
+   ============================================================ */
+function updateHud() {
+  scoreEl.textContent   = score;
+  hiscoreEl.textContent = highScore;
+  levelEl.textContent   = 1 + Math.floor((BASE_STEP - stepInterval) / STEP_GAIN);
+}
+
+function showOverlay(html) {
+  overlay.innerHTML = html;
+  overlay.classList.remove('hidden');
+  const btn = overlay.querySelector('.btn');
+  if (btn) btn.addEventListener('click', startGame);
+}
+function hideOverlay() { overlay.classList.add('hidden'); }
+
+function showStart() {
+  showOverlay(`
+    <div class="panel">
+      <h2 class="glitch" data-text="NEUROSNAKE">NEUROSNAKE</h2>
+      <p>
+        <span class="keys">ARROWS / WASD</span> — steer the daemon<br>
+        <span class="keys">SPACE</span> — pause uplink<br>
+        Consume data packets. Avoid walls and your own trail.<br>
+        Speed increases as your footprint grows.
+      </p>
+      <button class="btn">▶ Jack In</button>
+    </div>`);
+}
+
+function showPause() {
+  showOverlay(`
+    <div class="panel">
+      <h2 class="glitch" data-text="SUSPENDED">SUSPENDED</h2>
+      <p>Uplink paused. Press <span class="keys">SPACE</span> to resume.</p>
+      <button class="btn">Resume</button>
+    </div>`);
+}
+
+function showGameOver(isRecord) {
+  showOverlay(`
+    <div class="panel">
+      <h2 class="glitch red" data-text="SYSTEM FAILURE">SYSTEM FAILURE</h2>
+      <div class="final">
+        score <b>${score}</b> &nbsp;·&nbsp; hi-score <b>${highScore}</b>
+      </div>
+      ${isRecord ? '<div class="record">▲ NEW RECORD</div>' : ''}
+      <p>Connection terminated. The grid remembers.</p>
+      <button class="btn">⟳ Reboot</button>
+    </div>`);
+}
+
+/* ============================================================
+   State transitions
+   ============================================================ */
+function startGame() {
+  resetGame();
+  state = 'playing';
+  lastTime = performance.now();
+  hideOverlay();
+  blip(440, 0.05, 'square');
+}
+function pauseGame()  { if (state !== 'playing') return; state = 'paused'; showPause(); }
+function resumeGame() { if (state !== 'paused') return; state = 'playing'; lastTime = performance.now(); accumulator = 0; hideOverlay(); }
+
+function gameOver() {
+  state = 'over';
+  accumulator = 0;
+  const isRecord = score > highScore;
+  if (isRecord) { highScore = score; saveHigh(); }
+  updateHud();
+  blip(140, 0.35, 'sawtooth');
+  stage.classList.add('dead');
+  setTimeout(() => stage.classList.remove('dead'), 500);
+  showGameOver(isRecord);
+}
+
+function winGame() {
+  state = 'over';
+  const isRecord = score > highScore;
+  if (isRecord) { highScore = score; saveHigh(); }
+  updateHud();
+  showGameOver(isRecord);
+}
+
+/* ============================================================
+   7. TINY WEBAUDIO BLIPS (synthesized — no external assets)
+   ============================================================ */
+let actx = null;
+function blip(freq, dur, type) {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.06, actx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    osc.connect(gain).connect(actx.destination);
+    osc.start();
+    osc.stop(actx.currentTime + dur);
+  } catch (e) { /* audio unavailable — play silently */ }
+}
+
+/* ============================================================
+   SIZING + MAIN LOOP
+   ============================================================ */
+function sizeGame() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  gameCanvas.width  = Math.round(w * dpr);
+  gameCanvas.height = Math.round(h * dpr);
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cell = w / GRID_W;
+}
+
+function frame(now) {
+  drawRain();
+
+  if (state === 'playing') {
+    const dt = Math.min(now - lastTime, 250);   // clamp after tab stalls
+    lastTime = now;
+    accumulator += dt;
+    while (accumulator >= stepInterval) {       // fixed-step simulation
+      tick();
+      accumulator -= stepInterval;
+      if (state !== 'playing') break;
+    }
+  }
+
+  if (state === 'playing' || state === 'paused') {
+    render(accumulator / stepInterval, now);    // interpolated render
+  } else if (state === 'over') {
+    render(1, now);                             // freeze final frame
+  }
+
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', () => { sizeRain(); sizeGame(); });
+
+/* Boot */
+sizeRain();
+sizeGame();
+resetGame();
+showStart();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

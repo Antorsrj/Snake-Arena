@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEON SERPENT // CYBER SNAKE</title>
+  <style>
+    /* ========== CYBERPUNK DESIGN TOKENS ========== */
+    :root {
+      --bg-void: #05080a;
+      --bg-panel: rgba(0, 18, 12, 0.82);
+      --neon-green: #39ff14;
+      --neon-green-dim: #1a8a0a;
+      --neon-cyan: #00f0ff;
+      --neon-magenta: #ff00aa;
+      --neon-yellow: #f8ff2a;
+      --grid-line: rgba(57, 255, 20, 0.08);
+      --text-muted: rgba(57, 255, 20, 0.55);
+      --glow-green: 0 0 8px #39ff14, 0 0 24px rgba(57, 255, 20, 0.45);
+      --glow-cyan: 0 0 8px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.4);
+      --glow-magenta: 0 0 8px #ff00aa, 0 0 20px rgba(255, 0, 170, 0.4);
+      --font-mono: "Cascadia Code", "Segoe UI Mono", "SF Mono", "Consolas",
+        "Liberation Mono", "Courier New", monospace;
+      --font-display: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-void);
+      color: var(--neon-green);
+      font-family: var(--font-mono);
+    }
+
+    /* ========== MATRIX DIGITAL RAIN ========== */
+    #rain {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.55;
+    }
+
+    /* Scanlines overlay */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 2px,
+        rgba(0, 0, 0, 0.18) 4px
+      );
+      mix-blend-mode: multiply;
+    }
+
+    /* Subtle vignette + CRT flicker */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 49;
+      pointer-events: none;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
+      animation: flicker 6s infinite;
+    }
+
+    @keyframes flicker {
+      0%,
+      94%,
+      100% {
+        opacity: 1;
+      }
+      95% {
+        opacity: 0.92;
+      }
+      96% {
+        opacity: 1;
+      }
+      97% {
+        opacity: 0.85;
+      }
+      98% {
+        opacity: 1;
+      }
+    }
+
+    /* ========== LAYOUT ========== */
+    .shell {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      gap: 0.85rem;
+    }
+
+    /* Title with glitch */
+    .brand {
+      text-align: center;
+      user-select: none;
+    }
+
+    .brand h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      position: relative;
+      animation: titlePulse 3s ease-in-out infinite;
+    }
+
+    .brand h1::before,
+    .brand h1::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      letter-spacing: 0.35em;
+    }
+
+    .brand h1::before {
+      color: var(--neon-cyan);
+      clip-path: inset(0 0 55% 0);
+      transform: translate(-2px, 0);
+      opacity: 0.7;
+      animation: glitchTop 4s infinite linear;
+    }
+
+    .brand h1::after {
+      color: var(--neon-magenta);
+      clip-path: inset(55% 0 0 0);
+      transform: translate(2px, 0);
+      opacity: 0.7;
+      animation: glitchBot 3.5s infinite linear;
+    }
+
+    @keyframes titlePulse {
+      0%,
+      100% {
+        filter: brightness(1);
+      }
+      50% {
+        filter: brightness(1.15);
+      }
+    }
+
+    @keyframes glitchTop {
+      0%,
+      90%,
+      100% {
+        transform: translate(0);
+        opacity: 0;
+      }
+      91% {
+        transform: translate(-3px, -1px);
+        opacity: 0.85;
+      }
+      93% {
+        transform: translate(3px, 1px);
+        opacity: 0.6;
+      }
+      95% {
+        transform: translate(-1px, 0);
+        opacity: 0.9;
+      }
+    }
+
+    @keyframes glitchBot {
+      0%,
+      88%,
+      100% {
+        transform: translate(0);
+        opacity: 0;
+      }
+      89% {
+        transform: translate(3px, 1px);
+        opacity: 0.8;
+      }
+      92% {
+        transform: translate(-4px, -1px);
+        opacity: 0.55;
+      }
+      94% {
+        transform: translate(2px, 0);
+        opacity: 0.85;
+      }
+    }
+
+    .tagline {
+      margin-top: 0.35rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.28em;
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    /* HUD bar */
+    .hud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      justify-content: center;
+      align-items: center;
+      width: min(100%, 560px);
+      padding: 0.65rem 1rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--neon-green-dim);
+      box-shadow: 0 0 20px rgba(57, 255, 20, 0.15),
+        inset 0 0 30px rgba(0, 240, 255, 0.04);
+      clip-path: polygon(
+        0 0,
+        calc(100% - 12px) 0,
+        100% 12px,
+        100% 100%,
+        12px 100%,
+        0 calc(100% - 12px)
+      );
+    }
+
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      min-width: 5.5rem;
+    }
+
+    .hud-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .hud-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-value.cyan {
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+    }
+
+    .hud-value.magenta {
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+    }
+
+    /* Game stage */
+    .stage-wrap {
+      position: relative;
+      padding: 3px;
+      background: linear-gradient(
+        135deg,
+        var(--neon-green),
+        var(--neon-cyan),
+        var(--neon-magenta),
+        var(--neon-green)
+      );
+      background-size: 300% 300%;
+      animation: borderFlow 8s linear infinite;
+      clip-path: polygon(
+        0 10px,
+        10px 0,
+        calc(100% - 10px) 0,
+        100% 10px,
+        100% calc(100% - 10px),
+        calc(100% - 10px) 100%,
+        10px 100%,
+        0 calc(100% - 10px)
+      );
+      box-shadow: 0 0 40px rgba(57, 255, 20, 0.25),
+        0 0 80px rgba(0, 240, 255, 0.12);
+    }
+
+    @keyframes borderFlow {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    .stage-inner {
+      background: #020605;
+      padding: 0;
+      position: relative;
+    }
+
+    #game {
+      display: block;
+      width: min(92vw, 520px);
+      height: min(92vw, 520px);
+      background: #030a07;
+      image-rendering: pixelated;
+      cursor: none;
+    }
+
+    /* Overlays (start / pause / game over) */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      background: rgba(0, 8, 6, 0.88);
+      backdrop-filter: blur(2px);
+      text-align: center;
+      padding: 1.5rem;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      z-index: 5;
+    }
+
+    .overlay.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    #game:focus {
+      outline: none;
+    }
+
+    .overlay h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+      animation: glitchShake 0.4s steps(2) infinite alternate;
+    }
+
+    .overlay.start h2 {
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      animation: none;
+    }
+
+    .overlay.pause h2 {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 8px var(--neon-yellow);
+      animation: none;
+    }
+
+    @keyframes glitchShake {
+      0% {
+        transform: translate(0);
+      }
+      100% {
+        transform: translate(2px, -1px);
+      }
+    }
+
+    .overlay p {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      max-width: 22rem;
+      line-height: 1.6;
+    }
+
+    .overlay .final-score {
+      font-size: 1rem;
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      letter-spacing: 0.2em;
+    }
+
+    .btn {
+      margin-top: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #020605;
+      background: var(--neon-green);
+      border: none;
+      padding: 0.7rem 1.4rem;
+      cursor: pointer;
+      box-shadow: var(--glow-green);
+      clip-path: polygon(
+        0 0,
+        calc(100% - 8px) 0,
+        100% 8px,
+        100% 100%,
+        8px 100%,
+        0 calc(100% - 8px)
+      );
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    .btn:hover,
+    .btn:focus-visible {
+      transform: scale(1.04);
+      filter: brightness(1.15);
+      outline: none;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--neon-cyan);
+      border: 1px solid var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .controls-hint {
+      font-size: 0.62rem;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .controls-hint kbd {
+      display: inline-block;
+      padding: 0.1rem 0.35rem;
+      border: 1px solid var(--neon-green-dim);
+      color: var(--neon-cyan);
+      font-family: inherit;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      margin: 0 0.1rem;
+    }
+
+    .footer-line {
+      font-size: 0.55rem;
+      letter-spacing: 0.25em;
+      color: rgba(57, 255, 20, 0.35);
+      text-transform: uppercase;
+    }
+
+    /* Score pop toast */
+    .toast {
+      position: absolute;
+      top: 12%;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--neon-yellow);
+      font-size: 0.9rem;
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 10px var(--neon-yellow);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+      transition: opacity 0.2s, transform 0.4s;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -12px);
+    }
+
+    @media (max-width: 480px) {
+      .hud {
+        gap: 0.5rem 0.85rem;
+      }
+      .hud-stat {
+        min-width: 4.2rem;
+      }
+      .hud-value {
+        font-size: 0.95rem;
+      }
+      .brand h1 {
+        letter-spacing: 0.2em;
+      }
+      .brand h1::before,
+      .brand h1::after {
+        letter-spacing: 0.2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Matrix rain layer -->
+  <canvas id="rain" aria-hidden="true"></canvas>
+
+  <div class="shell">
+    <header class="brand">
+      <h1 data-text="NEON SERPENT">NEON SERPENT</h1>
+      <p class="tagline">// matrix protocol · eat · grow · survive</p>
+    </header>
+
+    <div class="hud" role="status" aria-live="polite">
+      <div class="hud-stat">
+        <span class="hud-label">Score</span>
+        <span class="hud-value" id="score">0000</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-label">High</span>
+        <span class="hud-value cyan" id="highScore">0000</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-label">Length</span>
+        <span class="hud-value magenta" id="length">003</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-label">Speed</span>
+        <span class="hud-value cyan" id="speed">01</span>
+      </div>
+    </div>
+
+    <div class="stage-wrap">
+      <div class="stage-inner">
+        <canvas id="game" width="520" height="520" tabindex="0" aria-label="Snake game board"></canvas>
+        <div class="toast" id="toast"></div>
+
+        <!-- Start overlay -->
+        <div class="overlay start visible" id="startOverlay">
+          <h2>Jack In</h2>
+          <p>
+            Guide the neon serpent through the grid. Consume data packets.
+            Avoid walls and your own trail. Speed rises as you grow.
+          </p>
+          <button class="btn" id="startBtn" type="button">Initialize</button>
+          <p class="controls-hint" style="margin-top: 0.75rem">
+            Then press <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or
+            <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move ·
+            <kbd>P</kbd> pause · <kbd>Space</kbd> restart
+          </p>
+        </div>
+
+        <!-- Pause overlay -->
+        <div class="overlay pause" id="pauseOverlay">
+          <h2>Paused</h2>
+          <p>Signal suspended. Press P or click Resume.</p>
+          <button class="btn secondary" id="resumeBtn" type="button">Resume</button>
+        </div>
+
+        <!-- Game over overlay -->
+        <div class="overlay" id="gameOverOverlay">
+          <h2>Signal Lost</h2>
+          <p class="final-score" id="finalScore">SCORE 0000</p>
+          <p id="newHighMsg" style="display: none; color: var(--neon-yellow)">
+            ◆ NEW HIGH SCORE LOGGED ◆
+          </p>
+          <button class="btn" id="restartBtn" type="button">Reboot</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="controls-hint">
+      ARROWS / WASD to move · P to pause · SPACE to reboot after crash
+    </p>
+    <p class="footer-line">offline · zero deps · localStorage high score</p>
+  </div>
+
+  <script>
+    /* ========================================================================
+       NEON SERPENT — Classic Snake with cyberpunk presentation
+       Single-file: no external libraries or CDN assets
+       ======================================================================== */
+
+    (function () {
+      "use strict";
+
+      /* ---------- Constants ---------- */
+      const GRID = 20; // cells per side
+      const CELL = 26; // pixels per cell (520 / 20)
+      const STORAGE_KEY = "neon-serpent-highscore";
+      const BASE_INTERVAL = 165; // ms between ticks at start (gentle runway)
+      const MIN_INTERVAL = 55; // fastest tick
+      const SPEED_STEP = 4; // ms removed per food eaten
+
+      /* ---------- DOM ---------- */
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const rainCanvas = document.getElementById("rain");
+      const rainCtx = rainCanvas.getContext("2d");
+
+      const scoreEl = document.getElementById("score");
+      const highScoreEl = document.getElementById("highScore");
+      const lengthEl = document.getElementById("length");
+      const speedEl = document.getElementById("speed");
+      const toastEl = document.getElementById("toast");
+
+      const startOverlay = document.getElementById("startOverlay");
+      const pauseOverlay = document.getElementById("pauseOverlay");
+      const gameOverOverlay = document.getElementById("gameOverOverlay");
+      const finalScoreEl = document.getElementById("finalScore");
+      const newHighMsg = document.getElementById("newHighMsg");
+
+      /* ---------- Game state ---------- */
+      let snake; // [{x,y}, ...] head first
+      let dir; // current direction
+      let nextDir; // queued direction (prevents double-reverse in one tick)
+      let food;
+      let score;
+      let highScore = Number(localStorage.getItem(STORAGE_KEY)) || 0;
+      let tickInterval;
+      let lastTick = 0;
+      let running = false;
+      let paused = false;
+      let gameOver = false;
+      let started = false;
+      let awaitingFirstMove = false; // after click-start, wait for a direction key
+      let animFrame = null;
+      let foodPulse = 0;
+
+      highScoreEl.textContent = pad(highScore, 4);
+
+      /* Direction vectors */
+      const DIRS = {
+        up: { x: 0, y: -1 },
+        down: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 },
+      };
+      const OPPOSITE = { up: "down", down: "up", left: "right", right: "left" };
+
+      /* ---------- Helpers ---------- */
+      function pad(n, w) {
+        return String(n).padStart(w, "0");
+      }
+
+      function randCell() {
+        return {
+          x: Math.floor(Math.random() * GRID),
+          y: Math.floor(Math.random() * GRID),
+        };
+      }
+
+      /** Place food on an empty cell */
+      function spawnFood() {
+        let spot;
+        let guard = 0;
+        do {
+          spot = randCell();
+          guard++;
+        } while (
+          snake.some((s) => s.x === spot.x && s.y === spot.y) &&
+          guard < 500
+        );
+        food = spot;
+      }
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => toastEl.classList.remove("show"), 650);
+      }
+
+      function updateHud() {
+        scoreEl.textContent = pad(score, 4);
+        highScoreEl.textContent = pad(highScore, 4);
+        lengthEl.textContent = pad(snake.length, 3);
+        const level = Math.max(
+          1,
+          Math.round((BASE_INTERVAL - tickInterval) / SPEED_STEP) + 1
+        );
+        speedEl.textContent = pad(level, 2);
+      }
+
+      /* ---------- Init / reset ---------- */
+      function resetGame() {
+        // Spawn left-of-center facing right so there is a long runway before a wall
+        const startX = Math.floor(GRID * 0.3);
+        const startY = Math.floor(GRID / 2);
+        snake = [
+          { x: startX, y: startY },
+          { x: startX - 1, y: startY },
+          { x: startX - 2, y: startY },
+        ];
+        dir = "right";
+        nextDir = "right";
+        score = 0;
+        tickInterval = BASE_INTERVAL;
+        gameOver = false;
+        paused = false;
+        awaitingFirstMove = false;
+        spawnFood();
+        updateHud();
+        gameOverOverlay.classList.remove("visible");
+        pauseOverlay.classList.remove("visible");
+        newHighMsg.style.display = "none";
+      }
+
+      /** Move keyboard focus onto the canvas so overlay buttons cannot steal Space */
+      function focusBoard() {
+        if (document.activeElement && document.activeElement !== canvas) {
+          document.activeElement.blur();
+        }
+        canvas.focus({ preventScroll: true });
+      }
+
+      /**
+       * @param {object} [opts]
+       * @param {boolean} [opts.waitForKey] - if true (button/Space start), freeze until a move key
+       * @param {string} [opts.initialDir] - optional direction when starting from a move key
+       */
+      function startGame(opts) {
+        const waitForKey = opts && opts.waitForKey;
+        const initialDir = opts && opts.initialDir;
+        resetGame();
+        started = true;
+        startOverlay.classList.remove("visible");
+        focusBoard();
+
+        if (initialDir && DIRS[initialDir]) {
+          dir = initialDir;
+          nextDir = initialDir;
+        }
+
+        if (waitForKey && !initialDir) {
+          // Click / Space / Enter: show the board but do not rush into a wall
+          running = false;
+          awaitingFirstMove = true;
+          showToast("PRESS DIRECTION");
+        } else {
+          running = true;
+          awaitingFirstMove = false;
+          lastTick = performance.now();
+        }
+        if (!animFrame) loop(performance.now());
+      }
+
+      function endGame() {
+        running = false;
+        gameOver = true;
+        awaitingFirstMove = false;
+        let isNewHigh = false;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem(STORAGE_KEY, String(highScore));
+          highScoreEl.textContent = pad(highScore, 4);
+          isNewHigh = true;
+        }
+        finalScoreEl.textContent = "SCORE " + pad(score, 4);
+        newHighMsg.style.display = isNewHigh ? "block" : "none";
+        gameOverOverlay.classList.add("visible");
+      }
+
+      function togglePause() {
+        if (!started || gameOver || awaitingFirstMove) return;
+        paused = !paused;
+        pauseOverlay.classList.toggle("visible", paused);
+        if (!paused) {
+          lastTick = performance.now();
+          focusBoard();
+          if (!animFrame) loop(lastTick);
+        }
+      }
+
+      /* ---------- Input ---------- */
+      const KEY_MAP = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        w: "up",
+        W: "up",
+        s: "down",
+        S: "down",
+        a: "left",
+        A: "left",
+        d: "right",
+        D: "right",
+      };
+
+      window.addEventListener("keydown", (e) => {
+        // Start on first movement if sitting on start screen
+        if (!started && KEY_MAP[e.key]) {
+          e.preventDefault();
+          startGame({ initialDir: KEY_MAP[e.key] });
+          return;
+        }
+
+        // After Initialize click: first move key both aims and starts the tick loop
+        if (awaitingFirstMove && KEY_MAP[e.key]) {
+          e.preventDefault();
+          dir = KEY_MAP[e.key];
+          nextDir = dir;
+          awaitingFirstMove = false;
+          running = true;
+          lastTick = performance.now();
+          return;
+        }
+
+        if (KEY_MAP[e.key]) {
+          e.preventDefault();
+          if (paused || gameOver) return;
+          queueDir(KEY_MAP[e.key]);
+          return;
+        }
+
+        if (e.key === "p" || e.key === "P") {
+          e.preventDefault();
+          togglePause();
+          return;
+        }
+
+        if (e.key === " " || e.key === "Enter") {
+          if (gameOver || (!started && startOverlay.classList.contains("visible"))) {
+            e.preventDefault();
+            startGame({ waitForKey: true });
+          }
+        }
+      });
+
+      function queueDir(d) {
+        // Reject 180° reverses relative to the direction currently in effect
+        if (OPPOSITE[dir] === d) return;
+        nextDir = d;
+      }
+
+      document.getElementById("startBtn").addEventListener("click", (e) => {
+        e.preventDefault();
+        startGame({ waitForKey: true });
+      });
+      document.getElementById("restartBtn").addEventListener("click", (e) => {
+        e.preventDefault();
+        startGame({ waitForKey: true });
+      });
+      document.getElementById("resumeBtn").addEventListener("click", (e) => {
+        e.preventDefault();
+        togglePause();
+      });
+
+      /* ---------- Simulation ---------- */
+      function tick() {
+        dir = nextDir;
+        const head = snake[0];
+        const step = DIRS[dir];
+        const nx = head.x + step.x;
+        const ny = head.y + step.y;
+
+        // Wall collision
+        if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) {
+          endGame();
+          return;
+        }
+
+        // Self collision (allow moving into the tail cell that will vacate,
+        // unless we just ate — so check against body excluding last segment
+        // when not eating)
+        const willEat = food.x === nx && food.y === ny;
+        const bodyToCheck = willEat ? snake : snake.slice(0, -1);
+        if (bodyToCheck.some((s) => s.x === nx && s.y === ny)) {
+          endGame();
+          return;
+        }
+
+        snake.unshift({ x: nx, y: ny });
+
+        if (willEat) {
+          score += 10 + Math.floor((BASE_INTERVAL - tickInterval) / 2);
+          tickInterval = Math.max(MIN_INTERVAL, tickInterval - SPEED_STEP);
+          spawnFood();
+          showToast("+DATA");
+          updateHud();
+        } else {
+          snake.pop();
+          updateHud();
+        }
+      }
+
+      /* ---------- Rendering ---------- */
+      function drawGrid() {
+        ctx.fillStyle = "#030a07";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Soft neon grid
+        ctx.strokeStyle = "rgba(57, 255, 20, 0.06)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= GRID; i++) {
+          const p = i * CELL + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(p, 0);
+          ctx.lineTo(p, canvas.height);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, p);
+          ctx.lineTo(canvas.width, p);
+          ctx.stroke();
+        }
+      }
+
+      function drawSnake() {
+        const len = snake.length;
+        snake.forEach((seg, i) => {
+          const t = i / Math.max(1, len - 1);
+          // Head = cyan, body fades green → magenta
+          let r, g, b;
+          if (i === 0) {
+            r = 0;
+            g = 240;
+            b = 255;
+          } else {
+            r = Math.floor(57 + t * 198);
+            g = Math.floor(255 - t * 100);
+            b = Math.floor(20 + t * 150);
+          }
+          const pad = i === 0 ? 1 : 2;
+          const x = seg.x * CELL + pad;
+          const y = seg.y * CELL + pad;
+          const s = CELL - pad * 2;
+
+          // Glow
+          ctx.shadowColor = `rgba(${r},${g},${b},0.9)`;
+          ctx.shadowBlur = i === 0 ? 14 : 8;
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x, y, s, s);
+
+          // Inner core highlight on head
+          if (i === 0) {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.fillRect(x + 4, y + 4, s - 8, s - 8);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x + 6, y + 6, s - 12, s - 12);
+          }
+        });
+        ctx.shadowBlur = 0;
+      }
+
+      function drawFood(time) {
+        foodPulse = (Math.sin(time / 180) + 1) / 2;
+        const pulse = 2 + foodPulse * 3;
+        const x = food.x * CELL;
+        const y = food.y * CELL;
+
+        ctx.shadowColor = "#ff00aa";
+        ctx.shadowBlur = 16 + foodPulse * 10;
+        ctx.fillStyle = "#ff00aa";
+        ctx.fillRect(x + pulse, y + pulse, CELL - pulse * 2, CELL - pulse * 2);
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ff66cc";
+        ctx.fillRect(x + pulse + 4, y + pulse + 4, CELL - pulse * 2 - 8, CELL - pulse * 2 - 8);
+
+        // Crosshair markers
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.5)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + CELL / 2, y);
+        ctx.lineTo(x + CELL / 2, y + 4);
+        ctx.moveTo(x + CELL / 2, y + CELL - 4);
+        ctx.lineTo(x + CELL / 2, y + CELL);
+        ctx.moveTo(x, y + CELL / 2);
+        ctx.lineTo(x + 4, y + CELL / 2);
+        ctx.moveTo(x + CELL - 4, y + CELL / 2);
+        ctx.lineTo(x + CELL, y + CELL / 2);
+        ctx.stroke();
+      }
+
+      function render(time) {
+        drawGrid();
+        if (food) drawFood(time);
+        if (snake) drawSnake();
+      }
+
+      /* ---------- Main loop ---------- */
+      function loop(now) {
+        animFrame = requestAnimationFrame(loop);
+
+        // Always draw overlays / idle board
+        if (!started) {
+          // Preview board on start screen
+          if (!snake) resetGame();
+          running = false;
+          render(now);
+          return;
+        }
+
+        if (paused || gameOver) {
+          render(now);
+          return;
+        }
+
+        if (running && now - lastTick >= tickInterval) {
+          // Catch up at most one tick to keep motion smooth under load
+          lastTick = now;
+          tick();
+        }
+        render(now);
+      }
+
+      /* ---------- Matrix digital rain ---------- */
+      const glyphs =
+        "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF<>{}[]|/\\$#@*+=";
+      let columns = [];
+      let rainW = 0;
+      let rainH = 0;
+      const FONT_SIZE = 16;
+
+      function resizeRain() {
+        rainW = rainCanvas.width = window.innerWidth;
+        rainH = rainCanvas.height = window.innerHeight;
+        const cols = Math.ceil(rainW / FONT_SIZE);
+        columns = Array.from({ length: cols }, () => ({
+          y: Math.random() * -100,
+          speed: 0.4 + Math.random() * 1.4,
+          trail: 8 + Math.floor(Math.random() * 18),
+        }));
+      }
+
+      function drawRain() {
+        // Fade trail
+        rainCtx.fillStyle = "rgba(5, 8, 10, 0.12)";
+        rainCtx.fillRect(0, 0, rainW, rainH);
+
+        rainCtx.font = FONT_SIZE + "px monospace";
+        for (let i = 0; i < columns.length; i++) {
+          const col = columns[i];
+          const x = i * FONT_SIZE;
+          for (let t = 0; t < col.trail; t++) {
+            const gy = Math.floor(col.y - t) * FONT_SIZE;
+            if (gy < -FONT_SIZE || gy > rainH) continue;
+            const ch = glyphs[(i * 7 + Math.floor(col.y) + t * 3) % glyphs.length];
+            if (t === 0) {
+              rainCtx.fillStyle = "#c8ffe0";
+            } else if (t < 3) {
+              rainCtx.fillStyle = "#39ff14";
+            } else {
+              const alpha = Math.max(0.05, 1 - t / col.trail);
+              rainCtx.fillStyle = `rgba(0, 180, 60, ${alpha})`;
+            }
+            rainCtx.fillText(ch, x, gy);
+          }
+          col.y += col.speed;
+          if (col.y * FONT_SIZE > rainH + col.trail * FONT_SIZE) {
+            col.y = Math.random() * -40;
+            col.speed = 0.4 + Math.random() * 1.4;
+            col.trail = 8 + Math.floor(Math.random() * 18);
+          }
+        }
+        requestAnimationFrame(drawRain);
+      }
+
+      window.addEventListener("resize", resizeRain);
+      resizeRain();
+      // Seed a dark base so first frames aren't blank white
+      rainCtx.fillStyle = "#05080a";
+      rainCtx.fillRect(0, 0, rainW, rainH);
+      drawRain();
+
+      /* ---------- Boot ---------- */
+      resetGame();
+      running = false;
+      started = false;
+      startOverlay.classList.add("visible");
+      lastTick = performance.now();
+      loop(lastTick);
+    })();
+  </script>
+</body>
+</html>
+

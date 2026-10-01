@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Snake - Terminal Edition</title>
+  <style>
+    /* ---- Root variables & reset ---- */
+    :root {
+      --bg: #0a0a0f;
+      --fg: #e0e0e0;
+      --accent-green: #00ff88;
+      --accent-cyan: #00ffff;
+      --accent-magenta: #ff00ff;
+      --glitch-duration: 0.3s;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: var(--bg);
+      color: var(--fg);
+      overflow: hidden;
+      min-height: 100vh;
+    }
+    
+    /* ---- Digital Rain Background ---- */
+    #rainCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    
+    /* Scanline overlay */
+    #scanline {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 136, 0.03) 2px,
+        rgba(0, 255, 136, 0.03) 4px
+      );
+      z-index: 1;
+    }
+    
+    /* ---- Game Canvas ---- */
+    #gameCanvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90vw;
+      max-width: 800px;
+      max-height: 80vh;
+      border: 2px solid var(--accent-green);
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.2), inset 0 0 20px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+      background: linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.5));
+    }
+    
+    /* ---- UI Elements ---- */
+    .ui-panel {
+      position: fixed;
+      z-index: 3;
+      font-size: 1.2rem;
+      text-shadow: 0 0 5px currentColor;
+    }
+    
+    #scorePanel {
+      top: 20px;
+      left: 20px;
+      color: var(--accent-cyan);
+    }
+    
+    #highScorePanel {
+      top: 20px;
+      right: 20px;
+      color: var(--accent-magenta);
+      text-align: right;
+    }
+    
+    /* Glitch effect on title */
+    .glitch {
+      position: relative;
+      display: inline-block;
+      animation: glitch var(--glitch-duration) infinite;
+    }
+    
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .glitch::before {
+      animation: glitch-before var(--glitch-duration) infinite;
+      clip: rect(44px 300px 56px 0);
+      top: -4px;
+      left: 2px;
+      background: var(--accent-green);
+      z-index: -1;
+      color: var(--bg);
+    }
+    
+    .glitch::after {
+      animation: glitch-after var(--glitch-duration) infinite;
+      clip: rect(14px 300px 30px 0);
+      top: 6px;
+      left: -2px;
+      background: var(--accent-magenta);
+      z-index: -2;
+      color: var(--bg);
+    }
+    
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 2px); }
+      40% { transform: translate(2px, -2px); }
+      60% { transform: translate(-2px, -2px); }
+      80% { transform: translate(2px, 2px); }
+      100% { transform: translate(0, 0); }
+    }
+    
+    @keyframes glitch-before {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 2px); }
+      40% { transform: translate(2px, -2px); }
+      60% { transform: translate(-2px, -2px); }
+      80% { transform: translate(2px, 2px); }
+      100% { transform: translate(0, 0); }
+    }
+    
+    @keyframes glitch-after {
+      0% { transform: translate(0); }
+      20% { transform: translate(2px, -2px); }
+      40% { transform: translate(-2px, -2px); }
+      60% { transform: translate(2px, 2px); }
+      80% { transform: translate(-2px, -2px); }
+      100% { transform: translate(0, 0); }
+    }
+    
+    /* Game Over Modal */
+    #gameOverModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      color: var(--accent-cyan);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+      font-size: 2rem;
+      letter-spacing: 0.3em;
+      transition: opacity 0.3s;
+    }
+    
+    #finalScore {
+      font-size: 1.5rem;
+      margin-top: 1rem;
+      color: var(--accent-green);
+    }
+    
+    #restartBtn {
+      margin-top: 2rem;
+      padding: 0.8rem 1.5rem;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1rem;
+      background: var(--accent-green);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      transition: background 0.3s, transform 0.2s;
+    }
+    
+    #restartBtn:hover {
+      background: var(--accent-cyan);
+    }
+    
+    #restartBtn:active {
+      transform: scale(0.98);
+    }
+    
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        transition-duration: 0s !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Digital Rain Background -->
+  <canvas id="rainCanvas"></canvas>
+  
+  <!-- Scanline overlay -->
+  <div id="scanline"></div>
+  
+  <!-- Game Canvas -->
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  
+  <!-- UI Panels -->
+  <div class="ui-panel" id="scorePanel">Score: <span id="scoreValue">0</span></div>
+  <div class="ui-panel" id="highScorePanel">High: <span id="highScoreValue">0</span></div>
+  
+  <!-- Game Over Modal -->
+  <div id="gameOverModal" style="display:none;">
+    <span class="glitch" data-text="GAME OVER">GAME OVER</span>
+    <div id="finalScore">Final Score: <span id="finalScoreValue">0</span></div>
+    <button id="restartBtn">RESTART</button>
+  </div>
+  
+  <script>
+    // ==========================================
+    // Configuration & State
+    // ==========================================
+    
+    const CONFIG = {
+      gridSize: 20,           // Snake grid cell size in pixels
+      initialSpeed: 150,      // Starting speed in ms per frame
+      speedDecrement: 15,     // How much to decrease speed per 5 points
+      minSpeed: 50,           // Minimum speed limit
+      foodColor: '#00ff88',
+      headColor: '#00ffcc',
+      bodyColor: '#00aa66'
+    };
+    
+    let canvas, ctx;
+    let rainCanvas, rainCtx;
+    let highScore;
+    let score = 0;
+    let direction = { x: 1, y: 0 }; // Start moving right
+    let nextDirection = { x: 1, y: 0 };
+    let snake = []; // Array of {x, y} grid coordinates
+    let food = { x: 0, y: 0 };
+    let gameLoop = null;
+    let isRunning = false;
+    let reducedMotion = false;
+    const TOTAL_COLS = 30; // Number of grid columns (600px / 20px = 30)
+    const TOTAL_ROWS = 30; // Number of grid rows (600px / 20px = 30)
+    
+    // ==========================================
+    // Digital Rain System
+    // ==========================================
+    
+    function initRain() {
+      rainCanvas = document.getElementById('rainCanvas');
+      rainCtx = rainCanvas.getContext('2d');
+      
+      const characters = '0123456789ABCDEF';
+      const drops = [];
+      const fontSize = Math.floor(rainCanvas.height / 20);
+      const columns = Math.ceil(rainCanvas.width / fontSize) + 1;
+      
+      for (let i = 0; i < columns; i++) {
+        drops[i] = 1; // y position starts at top
+      }
+      
+      function drawRain() {
+        // Create trailing effect with semi-transparent rect
+        rainCtx.fillStyle = 'rgba(10, 10, 15, 0.08)';
+        rainCtx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+        
+        rainCtx.fillStyle = '#0f0';
+        rainCtx.font = `${fontSize}px 'Courier New', monospace`;
+        
+        for (let i = 0; i < columns; i++) {
+          const text = characters[Math.floor(Math.random() * characters.length)];
+          rainCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+          
+          // Reset drop when it reaches bottom
+          if (drops[i] * fontSize > rainCanvas.height && Math.random() > 0.97) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+      }
+      
+      // Animation loop for rain
+      function animateRain() {
+        drawRain();
+        requestAnimationFrame(animateRain);
+      }
+      animateRain();
+    }
+    
+    // ==========================================
+    // Font Loading & Setup
+    // ==========================================
+    
+    function setupFonts() {
+      reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    
+    // ==========================================
+    // Game Initialization
+    // ==========================================
+    
+    function init() {
+      canvas = document.getElementById('gameCanvas');
+      ctx = canvas.getContext('2d');
+      
+      // Load high score from localStorage
+      const savedHighScore = localStorage.getItem('snakeHighScore');
+      highScore = savedHighScore ? parseInt(savedHighScore, 10) : 0;
+      updateHighScoreDisplay();
+      
+      // Initialize rain system
+      initRain();
+      
+      // Set up input controls
+      setupControls();
+      
+      // Start the game after a brief delay
+      setTimeout(startGame, 500);
+    }
+    
+    // ==========================================
+    // Input Controls
+    // ==========================================
+    
+    function setupControls() {
+      // Keyboard controls
+      document.addEventListener('keydown', (e) => {
+        // Prevent default scrolling for game keys
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'W', 'A', 'S', 'D'].includes(e.key)) {
+          e.preventDefault();
+        }
+        
+        // Direction controls - prevent reversing into itself
+        switch (e.key) {
+          case 'ArrowUp':
+          case 'W':
+            if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
+            break;
+          case 'ArrowDown':
+          case 'S':
+            if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
+            break;
+          case 'ArrowLeft':
+          case 'A':
+            if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
+            break;
+          case 'ArrowRight':
+          case 'D':
+            if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
+            break;
+        }
+      });
+      
+      // Touch/swipe controls for desktop
+      let touchStartX = 0;
+      let touchStartY = 0;
+      
+      canvas.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: false });
+      
+      canvas.addEventListener('touchend', (e) => {
+        if (touchStartX === 0 && touchStartY === 0) return;
+        
+        const diffX = e.changedTouches[0].clientX - touchStartX;
+        const diffY = e.changedTouches[0].clientY - touchStartY;
+        
+        // Reset touch start
+        touchStartX = 0;
+        touchStartY = 0;
+        
+        // Horizontal swipe
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+          if (diffX > 0 && direction.x !== 1) nextDirection = { x: 1, y: 0 };
+          if (diffX < 0 && direction.x !== -1) nextDirection = { x: -1, y: 0 };
+        } else {
+          // Vertical swipe
+          if (diffY > 0 && direction.y !== 1) nextDirection = { x: 0, y: 1 };
+          if (diffY < 0 && direction.y !== -1) nextDirection = { x: 0, y: -1 };
+        }
+      });
+    }
+    
+    // ==========================================
+    // Game Logic
+    // ==========================================
+    
+    function startGame() {
+      if (isRunning) return;
+      isRunning = true;
+      
+      // Reset game state
+      score = 0;
+      direction = { x: 1, y: 0 };
+      nextDirection = { x: 1, y: 0 };
+      snake = [];
+      
+      // Initial snake: 3 segments starting at top-left
+      for (let i = 2; i >= 0; i--) {
+        snake.push({ x: i, y: 0 });
+      }
+      
+      placeFood();
+      updateUI();
+      
+      // Clear any existing loop
+      if (gameLoop) clearInterval(gameLoop);
+      
+      // Game loop - runs at configured speed
+      let frameInterval = CONFIG.initialSpeed;
+      
+      // Internal game function that handles movement and tail management
+      function gameLoopFn() {
+        if (!isRunning) return;
+        
+        // Update direction
+        direction = { ...nextDirection };
+        
+        // Move snake: add new head
+        const headPos = snake[0];
+        const newHead = {
+          x: headPos.x + direction.x,
+          y: headPos.y + direction.y
+        };
+        
+        // Wall wrap-around
+        newHead.x = (newHead.x + TOTAL_COLS) % TOTAL_COLS;
+        newHead.y = (newHead.y + TOTAL_ROWS) % TOTAL_ROWS;
+        
+        snake.unshift(newHead);
+        
+        // Check collision with self
+        const head = snake[0];
+        for (let i = 1; i < snake.length; i++) {
+          if (head.x === snake[i].x && head.y === snake[i].y) {
+            gameOver();
+            return;
+          }
+        }
+        
+        // Check if food was eaten
+        if (head.x === food.x && head.y === food.y) {
+          score += 10;
+          placeFood();
+          // Speed up after eating
+          const speedBoost = Math.floor(score / 5);
+          if (speedBoost > 0) {
+            const newSpeed = Math.max(CONFIG.minSpeed, CONFIG.initialSpeed - (speedBoost * CONFIG.speedDecrement));
+            clearInterval(gameLoop);
+            gameLoop = setInterval(gameLoopFn, newSpeed);
+            return;
+          }
+        } else {
+          // Remove tail if no food eaten
+          snake.pop();
+        }
+        
+        draw();
+        updateUI();
+      }
+      
+      gameLoop = setInterval(gameLoopFn, frameInterval);
+    }
+    
+    function placeFood() {
+      let valid = false;
+      while (!valid) {
+        // Generate food position within grid (1 to 48 to allow some margin)
+        food.x = Math.floor(Math.random() * (TOTAL_COLS - 2)) + 1;
+        food.y = Math.floor(Math.random() * (TOTAL_ROWS - 2)) + 1;
+        
+        // Check it doesn't spawn on snake
+        valid = true;
+        for (const segment of snake) {
+          if (segment.x === food.x && segment.y === food.y) {
+            valid = false;
+            break;
+          }
+        }
+      }
+    }
+    
+    function gameOver() {
+      isRunning = false;
+      clearInterval(gameLoop);
+      gameLoop = null;
+      
+      // Update high score if applicable
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('snakeHighScore', highScore.toString());
+        updateHighScoreDisplay();
+      }
+      
+      // Show game over modal
+      const modal = document.getElementById('gameOverModal');
+      document.getElementById('finalScoreValue').textContent = score;
+      modal.style.display = 'flex';
+    }
+    
+    function restartGame() {
+      const modal = document.getElementById('gameOverModal');
+      modal.style.display = 'none';
+      startGame();
+    }
+    
+    // ==========================================
+    // Drawing Functions
+    // ==========================================
+    
+    function draw() {
+      // Clear canvas
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const gridSize = CONFIG.gridSize;
+      
+      // Draw food
+      ctx.fillStyle = CONFIG.foodColor;
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+      
+      // Draw snake head
+      ctx.fillStyle = CONFIG.headColor;
+      ctx.fillRect(snake[0].x * gridSize, snake[0].y * gridSize, gridSize, gridSize);
+      
+      // Draw snake body
+      ctx.fillStyle = CONFIG.bodyColor;
+      for (let i = 1; i < snake.length; i++) {
+        ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize, gridSize);
+      }
+      
+      // Draw subtle grid lines
+      ctx.strokeStyle = 'rgba(0, 255, 136, 0.1)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= TOTAL_COLS; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * gridSize, 0);
+        ctx.lineTo(i * gridSize, canvas.height);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, i * gridSize);
+        ctx.lineTo(canvas.width, i * gridSize);
+        ctx.stroke();
+      }
+    }
+    
+    // ==========================================
+    // UI Updates
+    // ==========================================
+    
+    function updateUI() {
+      document.getElementById('scoreValue').textContent = score;
+      document.getElementById('highScoreValue').textContent = highScore;
+    }
+    
+    function updateHighScoreDisplay() {
+      document.getElementById('highScoreValue').textContent = highScore;
+    }
+    
+    // ==========================================
+    // Startup
+    // ==========================================
+    
+    window.addEventListener('load', () => {
+      setupFonts();
+      init();
+    });
+    
+    // Restart button
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    
+    // Close modal on overlay click
+    document.getElementById('gameOverModal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        restartGame();
+      }
+    });
+  </script>
+</body>
+</html>

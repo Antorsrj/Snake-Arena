@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBER//SNAKE — NEURAL GRID PROTOCOL</title>
+<style>
+/* ================================================================
+   CYBER//SNAKE — single-file cyberpunk / Matrix Snake game
+   Palette: neon green #00ff66 · cyan #00e5ff · magenta #ff2ec4
+   ================================================================ */
+:root {
+  --green:   #00ff66;
+  --green-dim: rgba(0, 255, 102, .55);
+  --cyan:    #00e5ff;
+  --magenta: #ff2ec4;
+  --bg:      #020604;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  background: radial-gradient(ellipse at 50% 38%, #04140b 0%, #010402 75%);
+  color: var(--green);
+  font-family: "Consolas", "Cascadia Code", "SF Mono", Menlo, "Courier New", monospace;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---------- background layers (behind the UI) ---------- */
+#rain {
+  position: fixed; inset: 0; z-index: 0;
+  opacity: .55;
+}
+
+/* CRT scanlines */
+.scanlines {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, .28) 0px, rgba(0, 0, 0, .28) 1px,
+    transparent 1px, transparent 3px
+  );
+}
+
+/* slow travelling scan band */
+.scanband {
+  position: fixed; left: 0; right: 0; height: 140px; z-index: 41; pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent,
+    rgba(0, 255, 140, .05) 45%,
+    rgba(0, 255, 140, .09) 50%,
+    rgba(0, 255, 140, .05) 55%,
+    transparent);
+  animation: scanmove 8s linear infinite;
+}
+@keyframes scanmove { 0% { top: -25%; } 100% { top: 110%; } }
+
+/* vignette */
+.vignette {
+  position: fixed; inset: 0; z-index: 42; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .6) 100%);
+}
+
+/* ---------- main layout ---------- */
+.shell {
+  position: relative; z-index: 10; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px;
+}
+
+/* ---------- title ---------- */
+.title-block { text-align: center; }
+h1.glitch {
+  position: relative;
+  font-size: clamp(26px, 4.5vw, 44px);
+  font-weight: 700;
+  letter-spacing: .35em;
+  color: var(--green);
+  text-shadow: 0 0 8px rgba(0, 255, 102, .8), 0 0 30px rgba(0, 255, 102, .35);
+}
+/* glitch slices (chromatic aberration) */
+.glitch::before, .glitch::after {
+  content: attr(data-text);
+  position: absolute; left: 0; top: 0; width: 100%;
+  pointer-events: none;
+}
+.glitch::before { color: var(--cyan);    animation: glitchA 2.8s infinite steps(1); }
+.glitch::after  { color: var(--magenta); animation: glitchB 3.7s infinite steps(1); }
+@keyframes glitchA {
+  0%, 91%, 100% { opacity: 0; }
+  92% { opacity: .85; transform: translate(-3px, -2px); clip-path: inset(0 0 72% 0); }
+  94% { opacity: .85; transform: translate(2px, 1px);   clip-path: inset(42% 0 30% 0); }
+  96% { opacity: .85; transform: translate(-2px, 2px);  clip-path: inset(74% 0 4% 0); }
+}
+@keyframes glitchB {
+  0%, 88%, 100% { opacity: 0; }
+  89% { opacity: .8; transform: translate(3px, 1px);   clip-path: inset(10% 0 60% 0); }
+  92% { opacity: .8; transform: translate(-3px, -1px); clip-path: inset(55% 0 18% 0); }
+  95% { opacity: .8; transform: translate(1px, 2px);   clip-path: inset(80% 0 2% 0); }
+}
+.subtitle {
+  margin-top: 6px;
+  font-size: 11px; letter-spacing: .3em;
+  color: rgba(0, 229, 255, .75);
+}
+
+/* ---------- HUD ---------- */
+.hud { display: flex; gap: 30px; align-items: center; font-size: 14px; }
+.hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hud-label { font-size: 10px; letter-spacing: .25em; color: var(--green-dim); }
+.hud-value {
+  font-size: 20px; letter-spacing: .15em;
+  text-shadow: 0 0 8px rgba(0, 255, 102, .5);
+}
+.hud-value.cyan    { color: var(--cyan);    text-shadow: 0 0 8px rgba(0, 229, 255, .5); }
+.hud-value.magenta { color: var(--magenta); text-shadow: 0 0 8px rgba(255, 46, 196, .5); }
+.hud-btn {
+  background: none; border: 1px solid rgba(0, 255, 102, .4);
+  color: rgba(0, 255, 102, .8);
+  font: inherit; font-size: 11px; letter-spacing: .15em;
+  padding: 4px 8px; cursor: pointer;
+}
+.hud-btn:hover { background: rgba(0, 255, 102, .1); }
+
+/* ---------- play frame ---------- */
+.frame {
+  position: relative; padding: 10px;
+  border: 1px solid rgba(0, 255, 102, .35);
+  background: rgba(0, 12, 5, .5);
+  box-shadow: 0 0 28px rgba(0, 255, 102, .12), inset 0 0 46px rgba(0, 255, 102, .05);
+  animation: flicker 5s infinite;
+}
+@keyframes flicker {
+  0%, 91%, 94%, 97%, 100% { opacity: 1; }
+  92% { opacity: .86; }
+  96% { opacity: .93; }
+}
+canvas#game { display: block; cursor: crosshair; }
+
+/* neon corner brackets */
+.corner { position: absolute; width: 14px; height: 14px; z-index: 5; }
+.c-tl { top: -2px; left: -2px;    border-top: 2px solid var(--cyan);    border-left: 2px solid var(--cyan); }
+.c-tr { top: -2px; right: -2px;   border-top: 2px solid var(--magenta); border-right: 2px solid var(--magenta); }
+.c-bl { bottom: -2px; left: -2px; border-bottom: 2px solid var(--magenta); border-left: 2px solid var(--magenta); }
+.c-br { bottom: -2px; right: -2px;border-bottom: 2px solid var(--cyan);    border-right: 2px solid var(--cyan); }
+
+/* ---------- overlay screens (menu / pause / game over) ---------- */
+.overlay {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(1, 6, 3, .78);
+  backdrop-filter: blur(2px);
+  transition: opacity .25s;
+}
+.overlay.hidden { opacity: 0; pointer-events: none; }
+.ov-box { text-align: center; max-width: 92%; }
+.ov-title {
+  font-size: clamp(20px, 3.2vw, 34px);
+  letter-spacing: .3em; margin-bottom: 14px;
+}
+.ov-title.green   { color: var(--green);   text-shadow: 0 0 12px rgba(0, 255, 102, .5); }
+.ov-title.magenta {
+  color: var(--magenta); text-shadow: 0 0 12px rgba(255, 46, 196, .6);
+  animation: ovflicker .8s infinite steps(1);
+}
+@keyframes ovflicker { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
+.ov-text {
+  font-size: 13px; line-height: 1.9; letter-spacing: .08em;
+  color: rgba(180, 255, 205, .85);
+  margin-bottom: 18px;
+}
+.ov-text b { color: #fff; }
+.newrec { color: var(--magenta); }
+#startBtn {
+  font: inherit; font-size: 14px; letter-spacing: .3em;
+  padding: 10px 26px; cursor: pointer;
+  color: var(--green); background: rgba(0, 255, 102, .06);
+  border: 1px solid var(--green);
+  text-shadow: 0 0 8px rgba(0, 255, 102, .5);
+  transition: all .15s;
+}
+#startBtn:hover  { background: rgba(0, 255, 102, .16); box-shadow: 0 0 18px rgba(0, 255, 102, .35); }
+#startBtn:active { transform: scale(.97); }
+
+/* ---------- status line & footer ---------- */
+.statusline { font-size: 11px; letter-spacing: .2em; color: rgba(0, 255, 102, .5); }
+.statusline .prompt { color: rgba(0, 229, 255, .7); }
+footer.controls {
+  font-size: 11px; letter-spacing: .15em; text-align: center; line-height: 1.9;
+  color: rgba(0, 255, 102, .45);
+}
+kbd {
+  border: 1px solid rgba(0, 255, 102, .3);
+  padding: 1px 5px; font-size: 10px; color: rgba(0, 255, 102, .8);
+}
+</style>
+</head>
+<body>
+
+<!-- background / CRT layers -->
+<canvas id="rain"></canvas>
+<div class="scanband"></div>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<main class="shell">
+  <header class="title-block">
+    <h1 class="glitch" data-text="CYBER//SNAKE">CYBER//SNAKE</h1>
+    <div class="subtitle">// NEURAL GRID PROTOCOL v2.077</div>
+  </header>
+
+  <div class="hud">
+    <div class="hud-item"><span class="hud-label">SCORE</span><span id="score" class="hud-value">0000</span></div>
+    <div class="hud-item"><span class="hud-label">LEVEL</span><span id="level" class="hud-value cyan">01</span></div>
+    <div class="hud-item"><span class="hud-label">HIGH</span><span id="high" class="hud-value magenta">0000</span></div>
+    <button id="muteBtn" class="hud-btn" title="toggle sound (M)">SND:ON</button>
+  </div>
+
+  <div class="frame">
+    <div class="corner c-tl"></div><div class="corner c-tr"></div>
+    <div class="corner c-bl"></div><div class="corner c-br"></div>
+    <canvas id="game"></canvas>
+
+    <div id="overlay" class="overlay">
+      <div class="ov-box">
+        <div id="ovTitle" class="ov-title green">SYSTEM READY</div>
+        <div id="ovText" class="ov-text"></div>
+        <button id="startBtn">INITIALIZE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusline"><span class="prompt">&gt;_</span> STATUS: <span id="status">BOOT</span></div>
+
+  <footer class="controls">
+    <kbd>↑↓←→</kbd> / <kbd>WASD</kbd> steer &nbsp;·&nbsp; <kbd>P</kbd> halt &nbsp;·&nbsp;
+    <kbd>M</kbd> audio &nbsp;·&nbsp; <kbd>ENTER</kbd> run
+  </footer>
+</main>
+
+<script>
+(() => {
+'use strict';
+
+/* ================================================================
+   DOM REFS
+   ================================================================ */
+const $        = id => document.getElementById(id);
+const rainCv   = $('rain');
+const gameCv   = $('game');
+const scoreEl  = $('score');
+const highEl   = $('high');
+const levelEl  = $('level');
+const statusEl = $('status');
+const overlay  = $('overlay');
+const ovTitle  = $('ovTitle');
+const ovText   = $('ovText');
+const startBtn = $('startBtn');
+const muteBtn  = $('muteBtn');
+
+/* ================================================================
+   CONSTANTS
+   ================================================================ */
+const COLS = 24, ROWS = 24;                 // grid dimensions
+const BASE_INTERVAL = 150;                 // ms per move at the start
+const MIN_INTERVAL  = 65;                  // fastest possible move
+const SPEEDUP       = 4;                   // ms shaved off per node eaten
+const FOODS_PER_LEVEL = 5;                 // nodes per level (HUD + SFX)
+const HS_KEY = 'cybersnake.highscore';     // localStorage key
+
+const DIRS = {
+  up:    { x: 0,  y: -1 },
+  down:  { x: 0,  y: 1 },
+  left:  { x: -1, y: 0 },
+  right: { x: 1,  y: 0 },
+};
+/* e.code → direction (layout-independent WASD) */
+const KEY_TO_DIR = {
+  ArrowUp: 'up',    KeyW: 'up',
+  ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
+};
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let snake = [], prevSnake = [];           // prevSnake = positions before last step (for interpolation)
+let dir = DIRS.right;
+let queue = [];                           // buffered direction inputs (max 3)
+let food = null;
+let score = 0, eaten = 0, level = 1;
+let high = loadHigh();
+let startHigh = 0;                        // high score at run start (for "new record")
+let state = 'menu';                       // menu | playing | paused | dying | gameover
+let lastStep = 0, dieAt = 0;
+let particles = [], floaters = [];
+let shake = 0;
+let dtNow = 0, lastNow = performance.now();
+
+/* current move interval — shrinks as the snake grows */
+const interval = () => Math.max(MIN_INTERVAL, BASE_INTERVAL - eaten * SPEEDUP);
+
+/* ================================================================
+   PERSISTENCE (localStorage, guarded for sandboxed contexts)
+   ================================================================ */
+function loadHigh() {
+  try { return Math.max(0, parseInt(localStorage.getItem(HS_KEY), 10) || 0); }
+  catch (e) { return 0; }
+}
+function saveHigh() {
+  try { localStorage.setItem(HS_KEY, String(high)); } catch (e) { /* private mode — ignore */ }
+}
+
+/* ================================================================
+   CANVAS SIZING (crisp on HiDPI, capped DPR for perf)
+   ================================================================ */
+let W = 0, H = 0, cell = 20, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const size = Math.max(280, Math.min(window.innerWidth - 24, window.innerHeight - 250));
+  gameCv.style.width  = size + 'px';
+  gameCv.style.height = size + 'px';
+  gameCv.width  = Math.round(size * dpr);
+  gameCv.height = Math.round(size * dpr);
+  W = H = size * dpr;
+  cell = W / COLS;
+  resizeRain();
+}
+window.addEventListener('resize', resize);
+
+/* ================================================================
+   MATRIX RAIN (background canvas)
+   ================================================================ */
+const rctx   = rainCv.getContext('2d');
+const RAIN_FONT = 15;
+const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホ0123456789ABCDEF<>/\\{}[]$%#*+=~';
+let rainCols = [];
+
+function newRainCol(randomY) {
+  const len = Math.ceil(window.innerHeight / RAIN_FONT) + 2;
+  return {
+    y: randomY ? Math.random() * window.innerHeight : -Math.random() * window.innerHeight,
+    v: 40 + Math.random() * 120,                                  // px / s
+    chars: Array.from({ length: len }, () => GLYPHS[(Math.random() * GLYPHS.length) | 0]),
+  };
+}
+function resizeRain() {
+  rainCv.width  = window.innerWidth;
+  rainCv.height = window.innerHeight;
+  const cols = Math.ceil(window.innerWidth / RAIN_FONT);
+  while (rainCols.length < cols) rainCols.push(newRainCol(true));
+  rainCols.length = cols;
+}
+function drawRain(dt) {
+  const ctx = rctx;
+  /* translucent wash → falling trails */
+  ctx.fillStyle = 'rgba(1, 4, 2, 0.08)';
+  ctx.fillRect(0, 0, rainCv.width, rainCv.height);
+  ctx.font = RAIN_FONT + 'px monospace';
+  for (let i = 0; i < rainCols.length; i++) {
+    const c = rainCols[i];
+    c.y += c.v * dt;
+    if (c.y - c.chars.length * RAIN_FONT > window.innerHeight) {
+      rainCols[i] = newRainCol(false);                            // recycle column
+      continue;
+    }
+    const x = i * RAIN_FONT;
+    for (let r = 0; r < c.chars.length; r++) {
+      const y = c.y - r * RAIN_FONT;
+      if (y < -RAIN_FONT || y > window.innerHeight) continue;
+      const a = Math.max(0.04, 0.55 - r * 0.025);                 // fade toward tail
+      ctx.fillStyle = `rgba(0, 255, 130, ${a})`;
+      ctx.fillText(c.chars[r], x, y);
+    }
+  }
+}
+
+/* ================================================================
+   AUDIO (WebAudio synth — no assets)
+   ================================================================ */
+let actx = null, muted = false;
+function initAudio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur, type, vol, when = 0, slideTo = null) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + when;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+const sfx = {
+  eat()   { tone(880, 0.07, 'square', 0.05); tone(1318, 0.09, 'square', 0.04, 0.05); },
+  level() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.08, 'triangle', 0.05, i * 0.06)); },
+  die()   { tone(220, 0.5, 'sawtooth', 0.06, 0, 55); tone(110, 0.7, 'square', 0.05, 0.05, 40); },
+  start() { tone(440, 0.08, 'triangle', 0.05); tone(880, 0.1, 'triangle', 0.05, 0.08); },
+};
+function toggleMute() {
+  muted = !muted;
+  muteBtn.textContent = muted ? 'SND:OFF' : 'SND:ON';
+}
+muteBtn.addEventListener('click', toggleMute);
+
+/* ================================================================
+   HUD / OVERLAY HELPERS
+   ================================================================ */
+function updateHud() {
+  scoreEl.textContent = String(score).padStart(4, '0');
+  highEl.textContent  = String(high).padStart(4, '0');
+  levelEl.textContent = String(level).padStart(2, '0');
+}
+function setStatus(t) { statusEl.textContent = t; }
+function showOverlay(title, html, btn, cls) {
+  ovTitle.textContent = title;
+  ovTitle.dataset.text = title;
+  ovTitle.className = 'ov-title ' + (cls || 'green');
+  ovText.innerHTML = html;
+  startBtn.textContent = btn;
+  overlay.classList.remove('hidden');
+}
+function hideOverlay() { overlay.classList.add('hidden'); }
+
+/* ================================================================
+   GAME FLOW
+   ================================================================ */
+function startGame() {
+  const cx = COLS >> 1, cy = ROWS >> 1;
+  snake = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+  prevSnake = snake.map(p => ({ ...p }));
+  dir = DIRS.right;
+  queue = [];
+  score = 0; eaten = 0; level = 1;
+  particles = []; floaters = []; shake = 0;
+  startHigh = high;
+  spawnFood();
+  lastStep = performance.now();
+  state = 'playing';
+  hideOverlay();
+  updateHud();
+  setStatus('ONLINE');
+  initAudio();
+  sfx.start();
+}
+function pauseGame() {
+  if (state !== 'playing') return;
+  state = 'paused';
+  setStatus('HALTED');
+  showOverlay('SYSTEM HALTED',
+    'PROCESS SUSPENDED<br>[P] OR <b>CLICK</b> TO RESUME', 'RESUME', 'green');
+}
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = 'playing';
+  lastStep = performance.now();
+  hideOverlay();
+  setStatus('ONLINE');
+}
+function die() {
+  state = 'dying';
+  dieAt = performance.now() + 900;
+  const hx = (snake[0].x + 0.5) * cell, hy = (snake[0].y + 0.5) * cell;
+  burst(hx, hy, ['#00ff66', '#aaffcc', '#ffffff', '#ff2ec4'], 42, 260);
+  shake = 14;
+  sfx.die();
+  setStatus('OFFLINE');
+}
+function toGameOver() {
+  state = 'gameover';
+  const newRec = score > startHigh;
+  showOverlay('CONNECTION TERMINATED',
+    'FINAL SCORE: <b>' + String(score).padStart(4, '0') + '</b><br>' +
+    'HIGH SCORE:  <b>' + String(high).padStart(4, '0') + '</b>' +
+    (newRec ? '<br><span class="newrec">◆ NEW RECORD LOGGED ◆</span>' : ''),
+    'RE-INITIALIZE', 'magenta');
+}
+function winGame() {
+  state = 'gameover';
+  showOverlay('GRID SATURATED',
+    'THE ENTIRE MATRIX IS YOURS.<br>FINAL SCORE: <b>' + String(score).padStart(4, '0') + '</b>',
+    'RE-INITIALIZE', 'green');
+}
+
+/* ================================================================
+   CORE STEP (called at a fixed interval, not per frame)
+   ================================================================ */
+function step() {
+  prevSnake = snake.map(p => ({ ...p }));
+  if (queue.length) dir = DIRS[queue.shift()];
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  /* wall collision */
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) { die(); return; }
+
+  const willGrow = food && head.x === food.x && head.y === food.y;
+  /* self collision — the tail cell is safe unless we grow into it */
+  const body = willGrow ? snake : snake.slice(0, -1);
+  if (body.some(p => p.x === head.x && p.y === head.y)) { die(); return; }
+
+  snake.unshift(head);
+  if (willGrow) onEat(); else snake.pop();
+}
+
+function onEat() {
+  score += 10;
+  eaten++;
+  if (score > high) { high = score; saveHigh(); }
+  const newLevel = Math.floor(eaten / FOODS_PER_LEVEL) + 1;
+  if (newLevel !== level) {
+    level = newLevel;
+    sfx.level();
+    floaters.push({ x: W / 2, y: H / 2, txt: 'LEVEL ' + String(level).padStart(2, '0'), life: 1.4 });
+  }
+  sfx.eat();
+  const fx = (food.x + 0.5) * cell, fy = (food.y + 0.5) * cell;
+  burst(fx, fy, ['#00ff66', '#00e5ff', '#ff2ec4'], 16, 180);
+  floaters.push({ x: fx, y: fy, txt: '+10', life: 1 });
+  updateHud();
+  spawnFood();
+}
+
+/* place the node on a random free cell; no free cell → grid saturated */
+function spawnFood() {
+  const occupied = new Set(snake.map(p => p.x + ',' + p.y));
+  const free = [];
+  for (let x = 0; x < COLS; x++)
+    for (let y = 0; y < ROWS; y++)
+      if (!occupied.has(x + ',' + y)) free.push({ x, y });
+  if (!free.length) { food = null; winGame(); return; }
+  food = free[(Math.random() * free.length) | 0];
+}
+
+/* ================================================================
+   INPUT
+   ================================================================ */
+function queueDir(name) {
+  const d = DIRS[name];
+  const last = queue.length ? DIRS[queue[queue.length - 1]] : dir;
+  if (d.x === -last.x && d.y === -last.y) return;   // no 180° reversal
+  if (d.x === last.x && d.y === last.y) return;    // no duplicate
+  if (queue.length < 3) queue.push(name);
+}
+window.addEventListener('keydown', e => {
+  const k = e.code;
+  if (k === 'KeyM') { toggleMute(); return; }
+
+  if (state === 'playing') {
+    if (KEY_TO_DIR[k]) { e.preventDefault(); queueDir(KEY_TO_DIR[k]); }
+    else if (k === 'KeyP' || k === 'Escape') pauseGame();
+    return;
+  }
+  if (state === 'paused' && (k === 'KeyP' || k === 'Escape' || k === 'Enter' || k === 'Space')) {
+    e.preventDefault(); resumeGame(); return;
+  }
+  if ((state === 'menu' || state === 'gameover') &&
+      (k === 'Enter' || k === 'Space' || k === 'KeyR')) {
+    e.preventDefault(); startGame();
+  }
+});
+/* click / tap */
+gameCv.addEventListener('click', () => {
+  initAudio();
+  if (state === 'menu' || state === 'gameover') startGame();
+  else if (state === 'paused') resumeGame();
+});
+startBtn.addEventListener('click', () => {
+  if (state === 'paused') resumeGame(); else startGame();
+});
+/* swipe steering (bonus for touch devices) */
+let touchStart = null;
+gameCv.addEventListener('touchstart', e => {
+  touchStart = e.touches[0];
+  initAudio();
+}, { passive: true });
+gameCv.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const t  = e.changedTouches[0];
+  const dx = t.clientX - touchStart.clientX;
+  const dy = t.clientY - touchStart.clientY;
+  touchStart = null;
+  if (Math.abs(dx) + Math.abs(dy) < 24) return;      // tap → handled by click
+  if (state === 'menu' || state === 'gameover') { startGame(); return; }
+  if (state !== 'playing') return;
+  queueDir(Math.abs(dx) > Math.abs(dy)
+    ? (dx > 0 ? 'right' : 'left')
+    : (dy > 0 ? 'down' : 'up'));
+});
+/* auto-pause when the tab loses focus */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state === 'playing') pauseGame();
+});
+
+/* ================================================================
+   PARTICLES & FLOATING TEXT
+   ================================================================ */
+function burst(x, y, colors, count, speed) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const v = speed * dpr * (0.3 + Math.random() * 0.7);
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+      life: 1,
+      decay: 0.9 + Math.random() * 1.6,
+      size: (2 + Math.random() * 3) * dpr,
+      color: colors[(Math.random() * colors.length) | 0],
+    });
+  }
+}
+function updateFx(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.98; p.vy *= 0.98;
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= 28 * dpr * dt;
+    f.life -= dt * 0.9;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+}
+
+/* ================================================================
+   RENDERING
+   ================================================================ */
+const gctx = gameCv.getContext('2d');
+
+function drawGrid() {
+  const ctx = gctx;
+  ctx.strokeStyle = 'rgba(0, 255, 110, 0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < COLS; i++) { const p = i * cell; ctx.moveTo(p, 0); ctx.lineTo(p, H); }
+  for (let j = 1; j < ROWS; j++) { const p = j * cell; ctx.moveTo(0, p); ctx.lineTo(W, p); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0, 255, 110, 0.25)';
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+}
+
+function drawFood(now) {
+  const ctx = gctx;
+  const x = (food.x + 0.5) * cell, y = (food.y + 0.5) * cell;
+  const pulse = 1 + 0.18 * Math.sin(now / 140);
+  /* cyan containment ring */
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = 'rgba(0, 229, 255, 0.8)';
+  ctx.shadowBlur = cell * 0.4;
+  ctx.beginPath();
+  ctx.arc(x, y, cell * 0.42 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+  /* spinning magenta data node */
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.PI / 4 + now / 600);
+  ctx.fillStyle = '#ff2ec4';
+  ctx.shadowColor = 'rgba(255, 46, 196, 1)';
+  ctx.shadowBlur = cell * 0.7;
+  const s = cell * 0.30 * pulse;
+  ctx.fillRect(-s * 0.7, -s * 0.7, s * 1.4, s * 1.4);
+  ctx.restore();
+  ctx.shadowBlur = 0;
+}
+
+/* interpolated position of segment i between the last two steps */
+function segPoint(i, t) {
+  const c = snake[i];
+  const p = prevSnake[i] || prevSnake[prevSnake.length - 1] || c;
+  return {
+    x: (p.x + (c.x - p.x) * t + 0.5) * cell,
+    y: (p.y + (c.y - p.y) * t + 0.5) * cell,
+  };
+}
+
+function drawSnake(now) {
+  const ctx = gctx;
+  const t = state === 'playing' ? Math.min(1, (now - lastStep) / interval()) : 1;
+  const pts = [];
+  for (let i = 0; i < snake.length; i++) pts.push(segPoint(i, t));
+  const n = pts.length;
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  /* neon body — per-segment gradient from bright head to dim tail */
+  ctx.shadowColor = 'rgba(0, 255, 120, 0.9)';
+  ctx.shadowBlur = cell * 0.45;
+  for (let i = n - 1; i >= 1; i--) {
+    const k = i / Math.max(1, n - 1);
+    ctx.strokeStyle = `rgb(0, ${Math.round(255 - 150 * k)}, ${Math.round(150 - 90 * k)})`;
+    ctx.lineWidth = cell * 0.62;
+    ctx.beginPath();
+    ctx.moveTo(pts[i].x, pts[i].y);
+    ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  /* hot inner core */
+  for (let i = n - 1; i >= 1; i--) {
+    const k = i / Math.max(1, n - 1);
+    ctx.strokeStyle = `rgba(210, 255, 230, ${0.5 - 0.3 * k})`;
+    ctx.lineWidth = cell * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(pts[i].x, pts[i].y);
+    ctx.lineTo(pts[i - 1].x, pts[i - 1].y);
+    ctx.stroke();
+  }
+
+  /* head */
+  const h = pts[0];
+  ctx.shadowColor = 'rgba(0, 255, 150, 1)';
+  ctx.shadowBlur = cell * 0.6;
+  ctx.fillStyle = '#d6ffe8';
+  ctx.beginPath();
+  ctx.arc(h.x, h.y, cell * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  /* eyes, oriented along the travel direction */
+  const d = dir, px = -d.y, py = d.x;
+  ctx.fillStyle = '#001a0d';
+  const ex = cell * 0.16, ey = cell * 0.17;
+  for (const s of [1, -1]) {
+    ctx.beginPath();
+    ctx.arc(h.x + d.x * ex + px * ey * s, h.y + d.y * ex + py * ey * s, cell * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawFx() {
+  const ctx = gctx;
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    const s = p.size * p.life;
+    ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = (12 * dpr) + 'px monospace';
+  ctx.textAlign = 'center';
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+    ctx.fillStyle = '#aaffcc';
+    ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+function render(now) {
+  const ctx = gctx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  /* screen shake (decays) */
+  if (shake > 0.3) {
+    shake *= 0.88;
+    ctx.translate((Math.random() - 0.5) * shake * dpr, (Math.random() - 0.5) * shake * dpr);
+  } else shake = 0;
+
+  ctx.fillStyle = '#020803';
+  ctx.fillRect(-30, -30, W + 60, H + 60);
+  drawGrid();
+  if (food) drawFood(now);
+  drawSnake(now);
+  drawFx();
+}
+
+/* ================================================================
+   MAIN LOOP — fixed-timestep logic, interpolated rendering
+   ================================================================ */
+function loop(now) {
+  dtNow = Math.min(0.05, (now - lastNow) / 1000);
+  lastNow = now;
+
+  drawRain(dtNow);
+
+  if (state === 'playing') {
+    const iv = interval();
+    if (now - lastStep >= iv) {
+      const steps = Math.min(3, Math.floor((now - lastStep) / iv));
+      lastStep = now;
+      for (let i = 0; i < steps && state === 'playing'; i++) step();
+    }
+  }
+  if (state === 'dying' && now >= dieAt) toGameOver();
+
+  updateFx(dtNow);
+  render(now);
+  requestAnimationFrame(loop);
+}
+
+/* ================================================================
+   BOOT
+   ================================================================ */
+resize();
+/* decorative snake + node visible behind the menu */
+{
+  const cx = COLS >> 1, cy = ROWS >> 1;
+  snake = [{ x: cx, y: cy }, { x: cx - 1, y: cy }, { x: cx - 2, y: cy }];
+  prevSnake = snake.map(p => ({ ...p }));
+  food = { x: cx + 3, y: cy };
+}
+updateHud();
+setStatus('READY');
+showOverlay('SYSTEM READY',
+  'AWAITING NEURAL LINK<br><br>' +
+  '[↑↓←→ / WASD] STEER<br>' +
+  '[P] HALT // RESUME &nbsp; [M] AUDIO<br><br>' +
+  'CONSUME THE DATA NODES.<br>' +
+  'AVOID BOUNDARY AND SELF-CONTACT.',
+  'INITIALIZE', 'green');
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

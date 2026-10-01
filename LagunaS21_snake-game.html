@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER SNAKE • MATRIX</title>
+    <style>
+        /* ==================== ROOT & VARIABLES ==================== */
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-darker: #050505;
+            --neon-green: #00ff41;
+            --neon-cyan: #00f0ff;
+            --neon-magenta: #ff00ff;
+            --neon-purple: #8a00ff;
+            --glitch-red: #ff0044;
+            --text-primary: #00ff41;
+            --text-secondary: #00f0ff;
+            --grid-color: rgba(0, 255, 65, 0.07);
+            --scanline-color: rgba(0, 0, 0, 0.15);
+            --font-terminal: 'Courier New', Courier, monospace;
+            --glitch-speed: 0.3s;
+        }
+
+        /* ==================== RESET & BASE ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-terminal);
+            background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+            color: var(--neon-green);
+            user-select: none;
+            -webkit-font-smoothing: none;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ==================== MATRIX RAIN CANVAS ==================== */
+        #matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.15;
+        }
+
+        /* ==================== SCANLINE OVERLAY ==================== */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+            background: repeating-linear-gradient(
+                0deg,
+                var(--scanline-color),
+                var(--scanline-color) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            opacity: 0.4;
+        }
+
+        /* ==================== GLITCH BACKGROUND LAYER ==================== */
+        .glitch-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            background:
+                radial-gradient(circle at 20% 50%, var(--neon-cyan) 0%, transparent 25%),
+                radial-gradient(circle at 80% 30%, var(--neon-magenta) 0%, transparent 25%),
+                radial-gradient(circle at 50% 80%, var(--neon-green) 0%, transparent 30%);
+            opacity: 0.08;
+            animation: pulse-bg 6s ease-in-out infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { opacity: 0.08; }
+            50% { opacity: 0.12; }
+        }
+
+        /* ==================== MAIN CONTAINER ==================== */
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ==================== TERMINAL WINDOW ==================== */
+        .terminal {
+            position: relative;
+            width: 100%;
+            background: rgba(5, 5, 15, 0.85);
+            border: 2px solid var(--neon-green);
+            border-radius: 8px;
+            box-shadow:
+                0 0 20px var(--neon-green),
+                inset 0 0 30px rgba(0, 255, 65, 0.05);
+            backdrop-filter: blur(5px);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .terminal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(90deg,
+                var(--neon-green) 0%,
+                var(--neon-cyan) 20%,
+                var(--neon-magenta) 50%,
+                var(--neon-green) 80%,
+                var(--neon-cyan) 100%
+            );
+            z-index: 2;
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid var(--neon-green);
+            font-size: 12px;
+            color: var(--neon-cyan);
+            z-index: 2;
+            position: relative;
+        }
+
+        .terminal-header .window-controls {
+            display: flex;
+            gap: 8px;
+            margin-right: 12px;
+        }
+
+        .window-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            box-shadow: 0 0 5px var(--neon-green);
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .window-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .window-btn.red { background: var(--glitch-red); box-shadow: 0 0 5px var(--glitch-red); }
+        .window-btn.yellow { background: #ffaa00; box-shadow: 0 0 5px #ffaa00; }
+        .window-btn.green { background: #00cc44; box-shadow: 0 0 5px #00cc44; }
+
+        .terminal-title {
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: var(--neon-cyan);
+            flex: 1;
+        }
+
+        .terminal-title .blink {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* ==================== GAME HEADER / HUD ==================== */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .game-title {
+            font-size: 28px;
+            letter-spacing: 2px;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+            animation: glitch 3s infinite;
+            position: relative;
+        }
+
+        .game-title::before,
+        .game-title::after {
+            content: "CYBER SNAKE";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            color: var(--neon-green);
+        }
+
+        .game-title::before {
+            left: 2px;
+            text-shadow: -2px 0 var(--neon-magenta);
+            clip: rect(44px, 9999px, 56px, 0);
+            animation: glitch-anim 2s infinite;
+            animation-delay: 0.1s;
+        }
+
+        .game-title::after {
+            left: 1px;
+            text-shadow: -1px 0 var(--neon-cyan);
+            clip: rect(20px, 9999px, 32px, 0);
+            animation: glitch-anim 1.5s infinite;
+            animation-delay: 0.2s;
+        }
+
+        @keyframes glitch {
+            0%, 100% {
+                text-shadow:
+                    2px 0 var(--neon-magenta),
+                    -2px 0 var(--neon-cyan);
+            }
+            33% {
+                text-shadow:
+                    -2px 0 var(--neon-magenta),
+                    2px 0 var(--neon-cyan);
+            }
+            66% {
+                text-shadow:
+                    2px 0 var(--neon-magenta),
+                    -2px 0 var(--neon-cyan);
+            }
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 20px, 0); }
+            20% { clip: rect(40px, 9999px, 50px, 0); }
+            40% { clip: rect(70px, 9999px, 80px, 0); }
+            60% { clip: rect(30px, 9999px, 40px, 0); }
+            80% { clip: rect(60px, 9999px, 70px, 0); }
+            100% { clip: rect(10px, 9999px, 20px, 0); }
+        }
+
+        .hud-stats {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .stat-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 0 0 8px var(--neon-green);
+            line-height: 1;
+        }
+
+        /* ==================== GAME CANVAS AREA ==================== */
+        .game-area {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--neon-green);
+            border-radius: 4px;
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.2),
+                inset 0 0 15px rgba(0, 255, 65, 0.08);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* ==================== CONTROLS HINT ==================== */
+        .controls-hint {
+            margin-top: 16px;
+            padding: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--neon-cyan);
+            opacity: 0.6;
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .controls-hint .key {
+            display: inline-block;
+            min-width: 28px;
+            height: 28px;
+            line-height: 26px;
+            border: 1px solid var(--neon-green);
+            border-radius: 3px;
+            margin: 0 2px;
+            color: var(--neon-green);
+            text-shadow: 0 0 5px var(--neon-green);
+            background: rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+        }
+
+        /* ==================== GAME OVER SCREEN ==================== */
+        .game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 5, 10, 0.95);
+            z-index: 20;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .game-over.show {
+            display: flex;
+        }
+
+        .game-over h1 {
+            font-size: 48px;
+            color: var(--neon-magenta);
+            text-shadow:
+                0 0 10px var(--neon-magenta),
+                0 0 20px var(--neon-magenta),
+                0 0 40px var(--neon-magenta);
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; text-shadow:
+                0 0 5px var(--neon-magenta),
+                0 0 10px var(--neon-magenta),
+                0 0 20px var(--neon-magenta); }
+            50% { opacity: 1; text-shadow:
+                0 0 10px var(--neon-magenta),
+                0 0 20px var(--neon-magenta),
+                0 0 40px var(--neon-magenta),
+                0 0 60px var(--neon-magenta); }
+        }
+
+        .game-over .final-score {
+            font-size: 28px;
+            color: var(--neon-cyan);
+            margin-bottom: 8px;
+            text-shadow: 0 0 8px var(--neon-cyan);
+        }
+
+        .game-over .high-score {
+            font-size: 24px;
+            color: var(--neon-green);
+            margin-bottom: 30px;
+            text-shadow: 0 0 8px var(--neon-green);
+        }
+
+        .restart-btn {
+            padding: 14px 40px;
+            font-size: 16px;
+            font-family: var(--font-terminal);
+            font-weight: bold;
+            color: var(--bg-darker);
+            background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan));
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px var(--neon-green);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .restart-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px var(--neon-green), 0 5px 15px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-green));
+        }
+
+        .restart-btn:active {
+            transform: translateY(1px);
+        }
+
+        .restart-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent);
+            transition: 0.5s;
+        }
+
+        .restart-btn:hover::before {
+            left: 100%;
+        }
+
+        /* ==================== START SCREEN ==================== */
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 5, 10, 0.98);
+            z-index: 30;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .start-screen h1 {
+            font-size: 56px;
+            color: var(--neon-green);
+            text-shadow:
+                0 0 15px var(--neon-green),
+                0 0 30px var(--neon-green);
+            letter-spacing: 4px;
+            margin-bottom: 30px;
+            animation: glitch 2s infinite;
+        }
+
+        .start-screen h2 {
+            font-size: 20px;
+            color: var(--neon-cyan);
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+            opacity: 0.8;
+        }
+
+        .start-screen .instructions {
+            font-size: 14px;
+            color: var(--neon-magenta);
+            margin-bottom: 30px;
+            line-height: 1.8;
+            opacity: 0.7;
+        }
+
+        .start-screen .instructions .key-hint {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 22px;
+            border: 1px solid var(--neon-magenta);
+            border-radius: 3px;
+            margin: 0 3px;
+            color: var(--neon-magenta);
+            text-shadow: 0 0 5px var(--neon-magenta);
+            background: rgba(255, 0, 255, 0.1);
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 600px) {
+            .hud-stats {
+                gap: 16px;
+            }
+            .stat-value {
+                font-size: 20px;
+            }
+            .start-screen h1 {
+                font-size: 42px;
+            }
+            .game-over h1 {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ==================== MATRIX RAIN CANVAS ==================== -->
+    <canvas id="matrix-rain"></canvas>
+
+    <!-- ==================== GLITCH BACKGROUND ==================== -->
+    <div class="glitch-bg"></div>
+
+    <!-- ==================== SCANLINE OVERLAY ==================== -->
+    <div class="scanlines"></div>
+
+    <!-- ==================== MAIN CONTAINER ==================== -->
+    <div class="container">
+        <!-- ==================== TERMINAL WINDOW ==================== -->
+        <div class="terminal">
+            <!-- Terminal Header -->
+            <div class="terminal-header">
+                <div class="window-controls">
+                    <div class="window-btn red"></div>
+                    <div class="window-btn yellow"></div>
+                    <div class="window-btn green"></div>
+                </div>
+                <span class="terminal-title">~/cyber-snake/matrix-terminal<span class="blink">_</span></span>
+            </div>
+
+            <!-- Game Title / HUD -->
+            <div class="game-header">
+                <h1 class="game-title">CYBER SNAKE</h1>
+                <div class="hud-stats">
+                    <div class="stat-block">
+                        <span class="stat-label">Score</span>
+                        <span class="stat-value" id="score">0</span>
+                    </div>
+                    <div class="stat-block">
+                        <span class="stat-label">High Score</span>
+                        <span class="stat-value" id="high-score">0</span>
+                    </div>
+                    <div class="stat-block">
+                        <span class="stat-label">Level</span>
+                        <span class="stat-value" id="level">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Canvas Area -->
+            <div class="game-area">
+                <canvas id="game-canvas" width="500" height="500"></canvas>
+
+                <!-- Game Over Screen -->
+                <div class="game-over" id="game-over">
+                    <h1>💀 GAME OVER 💀</h1>
+                    <p class="final-score">Score: <span id="final-score">0</span></p>
+                    <p class="high-score">High Score: <span id="final-high-score">0</span></p>
+                    <button class="restart-btn" id="restart-btn">RESTART</button>
+                </div>
+            </div>
+
+            <!-- Controls Hint -->
+            <div class="controls-hint">
+                <span class="key">↑</span>
+                <span class="key">↓</span>
+                <span class="key">←</span>
+                <span class="key">→</span>
+                &nbsp;&nbsp;or&nbsp;&nbsp;
+                <span class="key">W</span>
+                <span class="key">A</span>
+                <span class="key">S</span>
+                <span class="key">D</span>
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                <span class="key">P</span> to pause
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== START SCREEN ==================== -->
+    <div class="start-screen" id="start-screen">
+        <h1>CYBER SNAKE</h1>
+        <h2>MATRIX EDITION</h2>
+        <div class="instructions">
+            Consume the <span style="color:var(--neon-green)">NEON NEXUS</span> to grow and score.<br>
+            Avoid hitting the <span style="color:var(--neon-magenta)">WALLS</span> and <span style="color:var(--neon-cyan)">YOURSELF</span>.<br><br>
+            Controls: <span class="key-hint">↑</span> <span class="key-hint">↓</span> <span class="key-hint">←</span> <span class="key-hint">→</span> or <span class="key-hint">W</span> <span class="key-hint">A</span> <span class="key-hint">S</span> <span class="key-hint">D</span><br>
+            Pause: <span class="key-hint">P</span>
+        </div>
+        <button class="restart-btn" id="start-btn">INITIATE</button>
+    </div>
+
+    <!-- ==================== GLITCH EFFECT OVERLAY ==================== */
+    <div id="glitch-overlay"></div>
+
+    <script>
+        // ============================================================================
+        // CYBER SNAKE - MATRIX EDITION
+        // A retro-futuristic Snake game with Cyberpunk/Matrix aesthetics
+        // ============================================================================
+
+        // ======================== CONFIGURATION ========================
+        const CONFIG = {
+            canvasWidth: 500,
+            canvasHeight: 500,
+            gridSize: 25,           // Number of cells per side
+            cellSize: 20,           // Size of each cell in pixels
+            baseSpeed: 150,         // Initial milliseconds between moves
+            speedIncrement: 8,      // Speed increase per food eaten (ms reduction)
+            minSpeed: 55,           // Minimum milliseconds (hardest speed)
+            colors: {
+                snakeHead: '#00ff41',
+                snakeBody: '#00cc33',
+                snakeHeadGlow: '#00ff41',
+                food: '#ff00ff',
+                foodGlow: '#ff00ff',
+                grid: 'rgba(0, 255, 65, 0.08)',
+                background: '#05050a'
+            }
+        };
+
+        // ======================== MATRIX RAIN ========================
+        // Class to generate and animate the Matrix-style digital rain effect
+        class MatrixRain {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.columns = [];
+                this.fontSize = 16;
+                this.characters = 'アァカサタナハマヤラワガザダナバパイィチミリヒミリピビビツッヌムユルヴプツメエェセヘメレヶヾエヶソッヤレユメヨロヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                this.init();
+            }
+
+            init() {
+                // Set canvas size to match window
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+
+                // Calculate number of columns
+                const numCols = Math.floor(this.canvas.width / this.fontSize);
+                this.columns = Array(numCols).fill(0);
+            }
+
+            resize() {
+                this.init();
+            }
+
+            draw() {
+                // Semi-transparent fill for trail effect
+                this.ctx.fillStyle = 'rgba(5, 5, 10, 0.15)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw characters
+                this.ctx.font = `${this.fontSize}px monospace`;
+                this.ctx.fillStyle = '#00ff41';
+                this.ctx.globalAlpha = 0.7;
+
+                for (let i = 0; i < this.columns.length; i++) {
+                    const text = this.characters[Math.floor(Math.random() * this.characters.length)];
+                    const x = i * this.fontSize;
+                    const y = this.columns[i] * this.fontSize;
+
+                    // Draw character with slight randomness
+                    this.ctx.fillText(text, x, y);
+
+                    // Reset column if it reaches bottom
+                    if (y > this.canvas.height && Math.random() > 0.975) {
+                        this.columns[i] = 0;
+                    }
+
+                    // Increment the y position
+                    this.columns[i]++;
+                }
+
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // ======================== SNAKE GAME CLASS ========================
+        class SnakeGame {
+            constructor(canvas, config) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.config = config;
+
+                // Game state
+                this.snake = [];
+                this.direction = { x: 1, y: 0 };
+                this.nextDirection = { x: 1, y: 0 };
+                this.food = null;
+                this.score = 0;
+                this.highScore = 0;
+                this.level = 1;
+                this.gameSpeed = config.baseSpeed;
+                this.isRunning = false;
+                this.isPaused = false;
+                this.gameLoop = null;
+
+                // Grid properties
+                this.cols = config.gridSize;
+                this.rows = config.gridSize;
+                this.cellSize = config.cellSize;
+
+                // Bind event listeners
+                this.bindEvents();
+
+                // Load high score from localStorage
+                this.loadHighScore();
+
+                // Initialize the game
+                this.init();
+            }
+
+            bindEvents() {
+                document.addEventListener('keydown', (e) => this.handleInput(e));
+            }
+
+            handleInput(e) {
+                // Prevent arrow keys from scrolling the page
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.code)) {
+                    e.preventDefault();
+                }
+
+                // Pause toggle
+                if (e.code === 'KeyP') {
+                    if (this.isRunning) this.togglePause();
+                    return;
+                }
+
+                if (!this.isRunning) return;
+
+                // Arrow keys and WASD controls
+                switch (e.code) {
+                    case 'ArrowUp':
+                    case 'KeyW':
+                        if (this.direction.y === 0) {
+                            this.nextDirection = { x: 0, y: -1 };
+                        }
+                        break;
+                    case 'ArrowDown':
+                    case 'KeyS':
+                        if (this.direction.y === 0) {
+                            this.nextDirection = { x: 0, y: 1 };
+                        }
+                        break;
+                    case 'ArrowLeft':
+                    case 'KeyA':
+                        if (this.direction.x === 0) {
+                            this.nextDirection = { x: -1, y: 0 };
+                        }
+                        break;
+                    case 'ArrowRight':
+                    case 'KeyD':
+                        if (this.direction.x === 0) {
+                            this.nextDirection = { x: 1, y: 0 };
+                        }
+                        break;
+                }
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+
+                const pauseText = this.getPauseText();
+
+                if (this.isPaused) {
+                    clearInterval(this.gameLoop);
+                    this.drawPauseMessage(pauseText);
+                } else {
+                    this.gameLoop = setInterval(() => this.update(), this.gameSpeed);
+                }
+            }
+
+            getPauseText() {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 255, 65, 0.9)';
+                ctx.font = 'bold 36px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('SYSTEM PAUSED', this.canvas.width / 2, this.canvas.height / 2);
+                ctx.restore();
+            }
+
+            drawPauseMessage() {
+                this.ctx.fillStyle = 'rgba(5, 5, 10, 0.85)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.fillStyle = '#00f0ff';
+                this.ctx.font = 'bold 36px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('SYSTEM PAUSED', this.canvas.width / 2, this.canvas.height / 2 - 20);
+
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = '16px monospace';
+                this.ctx.fillText('Press P to resume', this.canvas.width / 2, this.canvas.height / 2 + 20);
+            }
+
+            init() {
+                // Set canvas size
+                this.canvas.width = this.config.canvasWidth;
+                this.canvas.height = this.config.canvasHeight;
+
+                // Initialize snake in the center
+                const startX = Math.floor(this.cols / 2);
+                const startY = Math.floor(this.rows / 2);
+
+                this.snake = [
+                    { x: startX, y: startY },
+                    { x: startX - 1, y: startY },
+                    { x: startX - 2, y: startY }
+                ];
+
+                this.direction = { x: 1, y: 0 };
+                this.nextDirection = { x: 1, y: 0 };
+
+                // Place initial food
+                this.spawnFood();
+
+                // Reset game stats
+                this.score = 0;
+                this.level = 1;
+                this.gameSpeed = this.config.baseSpeed;
+
+                // Update HUD
+                this.updateHUD();
+
+                // Draw initial state
+                this.draw();
+            }
+
+            spawnFood() {
+                // Generate valid food position (not on snake)
+                let newPos;
+                do {
+                    newPos = {
+                        x: Math.floor(Math.random() * this.cols),
+                        y: Math.floor(Math.random() * this.rows)
+                    };
+                } while (this.snake.some(segment => segment.x === newPos.x && segment.y === newPos.y));
+
+                this.food = newPos;
+            }
+
+            update() {
+                if (this.isPaused) return;
+
+                // Apply next direction
+                this.direction = this.nextDirection;
+
+                // Calculate new head position
+                const head = { ...this.snake[0] };
+                head.x += this.direction.x;
+                head.y += this.direction.y;
+
+                // Check wall collision
+                if (head.x < 0 || head.x >= this.cols || head.y < 0 || head.y >= this.rows) {
+                    this.gameOver();
+                    return;
+                }
+
+                // Check self collision
+                if (this.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                    this.gameOver();
+                    return;
+                }
+
+                // Add new head
+                this.snake.unshift(head);
+
+                // Check food collection
+                if (head.x === this.food.x && head.y === this.food.y) {
+                    this.score += 10;
+                    this.spawnFood();
+
+                    // Increase difficulty
+                    this.gameSpeed = Math.max(this.config.minSpeed, this.gameSpeed - this.config.speedIncrement);
+                    this.level = Math.floor((this.config.baseSpeed - this.gameSpeed) / this.config.speedIncrement) + 1;
+
+                    // Restart game loop with new speed
+                    clearInterval(this.gameLoop);
+                    this.gameLoop = setInterval(() => this.update(), this.gameSpeed);
+                } else {
+                    // Remove tail if no food eaten
+                    this.snake.pop();
+                }
+
+                // Update HUD
+                this.updateHUD();
+
+                // Draw everything
+                this.draw();
+            }
+
+            drawGrid() {
+                this.ctx.strokeStyle = this.config.colors.grid;
+                this.ctx.lineWidth = 1;
+
+                // Draw vertical lines
+                for (let x = 0; x <= this.canvas.width; x += this.cellSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.stroke();
+                }
+
+                // Draw horizontal lines
+                for (let y = 0; y <= this.canvas.height; y += this.cellSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawSnake() {
+                for (let i = this.snake.length - 1; i >= 0; i--) {
+                    const segment = this.snake[i];
+                    const px = segment.x * this.cellSize;
+                    const py = segment.y * this.cellSize;
+
+                    if (i === 0) {
+                        // Draw snake head with neon glow
+                        this.drawSegment(px, py, this.config.colors.snakeHead, this.config.colors.snakeHeadGlow, true);
+                    } else {
+                        // Draw body segments (darker as they get farther from head)
+                        const darkness = Math.min(0.5, i * 0.05);
+                        const bodyColor = this.adjustBrightness(this.config.colors.snakeBody, -darkness * 50);
+                        const bodyGlow = this.adjustBrightness(this.config.colors.snakeHeadGlow, -darkness * 50);
+                        this.drawSegment(px, py, bodyColor, bodyGlow, false);
+                    }
+                }
+            }
+
+            drawSegment(x, y, color, glowColor, isHead) {
+                const size = this.cellSize;
+                const radius = isHead ? size * 0.4 : size * 0.35;
+
+                // Glow effect
+                this.ctx.save();
+                this.ctx.shadowColor = glowColor;
+                this.ctx.shadowBlur = isHead ? 8 : 5;
+                this.ctx.fillStyle = color;
+
+                // Draw rounded rectangle
+                this.roundRect(this.ctx, x + size * 0.1, y + size * 0.1, size * 0.8, size * 0.8, radius);
+                this.ctx.fill();
+
+                // Draw eyes on head
+                if (isHead) {
+                    this.drawEyes(x, y, size);
+                }
+
+                this.ctx.restore();
+            }
+
+            drawEyes(x, y, size) {
+                const eyeSize = size * 0.12;
+                const eyeOffset = size * 0.25;
+
+                // Calculate eye positions based on direction
+                const eyeX1 = x + size * 0.3 - eyeSize / 2 + this.direction.x * eyeOffset * 0.3;
+                const eyeY1 = y + size * 0.3 - eyeSize / 2 + this.direction.y * eyeOffset * 0.3;
+                const eyeX2 = x + size * 0.7 - eyeSize / 2 + this.direction.x * eyeOffset * 0.3;
+                const eyeY2 = y + size * 0.3 - eyeSize / 2 + this.direction.y * eyeOffset * 0.3;
+
+                // Pupil positions (pointing in direction of movement)
+                const pupilSize = eyeSize * 0.5;
+
+                // First eye
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(eyeX1, eyeY1, eyeSize, eyeSize);
+                this.ctx.fillStyle = '#00ff41';
+                this.ctx.fillRect(
+                    eyeX1 + eyeSize / 2 - pupilSize / 2 + this.direction.x * pupilSize,
+                    eyeY1 + eyeSize / 2 - pupilSize / 2 + this.direction.y * pupilSize,
+                    pupilSize, pupilSize
+                );
+
+                // Second eye
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(eyeX2, eyeY2, eyeSize, eyeSize);
+                this.ctx.fillStyle = '#00ff41';
+                this.ctx.fillRect(
+                    eyeX2 + eyeSize / 2 - pupilSize / 2 + this.direction.x * pupilSize,
+                    eyeY2 + eyeSize / 2 - pupilSize / 2 + this.direction.y * pupilSize,
+                    pupilSize, pupilSize
+                );
+            }
+
+            drawFood() {
+                const x = this.food.x * this.cellSize;
+                const y = this.food.y * this.cellSize;
+                const size = this.cellSize;
+
+                this.ctx.save();
+
+                // Pulsing glow
+                const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+                this.ctx.shadowColor = this.config.colors.foodGlow;
+                this.ctx.shadowBlur = 15 * pulse;
+
+                // Draw neon nexus (food)
+                this.ctx.fillStyle = this.config.colors.food;
+                this.roundRect(this.ctx, x + 4, y + 4, size - 8, size - 8, size * 0.3);
+                this.ctx.fill();
+
+                // Energy particles around food
+                const time = Date.now() * 0.003;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2 + time;
+                    const radius = size * 0.3 + Math.sin(time * 2 + i) * 2;
+                    const px = x + size / 2 + Math.cos(angle) * radius;
+                    const py = y + size / 2 + Math.sin(angle) * radius;
+
+                    this.ctx.beginPath();
+                    this.ctx.arc(px, py, 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                this.ctx.restore();
+            }
+
+            draw() {
+                // Clear canvas
+                this.ctx.fillStyle = this.config.colors.background;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw grid
+                this.drawGrid();
+
+                // Draw neon border
+                this.drawNeonBorder();
+
+                // Draw food
+                this.drawFood();
+
+                // Draw snake
+                this.drawSnake();
+            }
+
+            drawNeonBorder() {
+                this.ctx.save();
+                this.ctx.strokeStyle = '#ff00ff';
+                this.ctx.shadowColor = '#ff00ff';
+                this.ctx.shadowBlur = 10;
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(1, 1, this.canvas.width - 2, this.canvas.height - 2);
+                this.ctx.restore();
+            }
+
+            roundRect(ctx, x, y, width, height, radius) {
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                ctx.lineTo(x + radius, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+            }
+
+            adjustBrightness(hex, percent) {
+                const R = parseInt(hex.substr(1, 2), 16);
+                const G = parseInt(hex.substr(3, 2), 16);
+                const B = parseInt(hex.substr(5, 2), 16);
+
+                const newR = Math.min(255, Math.max(0, R + percent));
+                const newG = Math.min(255, Math.max(0, G + percent));
+                const newB = Math.min(255, Math.max(0, B + percent));
+
+                return `rgb(${newR}, ${newG}, ${newB})`;
+            }
+
+            updateHUD() {
+                // Update score display
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('high-score').textContent = this.highScore;
+                document.getElementById('level').textContent = this.level;
+            }
+
+            loadHighScore() {
+                const stored = localStorage.getItem('cyberSnakeHighScore');
+                this.highScore = stored ? parseInt(stored) : 0;
+            }
+
+            saveHighScore() {
+                localStorage.setItem('cyberSnakeHighScore', this.highScore.toString());
+            }
+
+            startGame() {
+                // Hide start screen
+                document.getElementById('start-screen').classList.remove('show');
+
+                // Initialize game state
+                this.init();
+
+                // Start game loop
+                this.isRunning = true;
+                this.isPaused = false;
+                this.gameLoop = setInterval(() => this.update(), this.gameSpeed);
+            }
+
+            gameOver() {
+                this.isRunning = false;
+                clearInterval(this.gameLoop);
+
+                // Update high score
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    this.saveHighScore();
+                }
+
+                // Show game over screen
+                const gameOverScreen = document.getElementById('game-over');
+                gameOverScreen.classList.add('show');
+                document.getElementById('final-score').textContent = this.score;
+                document.getElementById('final-high-score').textContent = this.highScore;
+
+                // Draw final frame
+                this.draw();
+            }
+
+            restart() {
+                // Hide game over screen
+                document.getElementById('game-over').classList.remove('show');
+
+                // Start game
+                this.startGame();
+            }
+        }
+
+        // ======================== GLITCH EFFECT ========================
+        // Creates random glitch effects on the game screen
+        class GlitchEffect {
+            constructor() {
+                this.overlay = document.getElementById('glitch-overlay');
+                this.isGlitching = false;
+                this.glitchInterval = null;
+            }
+
+            start() {
+                // Create glitch overlay element
+                this.overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 5;
+                    mix-blend-mode: screen;
+                    opacity: 0;
+                    transition: opacity 0.1s;
+                `;
+            }
+
+            trigger() {
+                if (this.isGlitching) return;
+                this.isGlitching = true;
+
+                const glitches = Math.floor(Math.random() * 3) + 1;
+
+                for (let i = 0; i < glitches; i++) {
+                    setTimeout(() => {
+                        this.doGlitch();
+                    }, i * 150);
+                }
+
+                setTimeout(() => {
+                    this.isGlitching = false;
+                }, glitches * 150 + 200);
+            }
+
+            doGlitch() {
+                const intensity = Math.random() * 0.7 + 0.3;
+                const translateX = (Math.random() - 0.5) * 10 * intensity;
+                const scaleX = 1 + (Math.random() - 0.5) * 0.2 * intensity;
+                const hueRotate = Math.random() * 360;
+
+                this.overlay.style.cssText += `
+                    background: 
+                        repeating-linear-gradient(
+                            0deg,
+                            rgba(0,255,65,0.3),
+                            rgba(0,255,65,0.3) ${5 * intensity}px,
+                            transparent ${5 * intensity}px,
+                            transparent ${10 * intensity}px
+                        );
+                    transform: translateX(${translateX}px) scaleX(${scaleX});
+                    filter: hue-rotate(${hueRotate}deg);
+                    opacity: 0.3;
+                `;
+
+                setTimeout(() => {
+                    this.overlay.style.opacity = '0';
+                    this.overlay.style.transform = 'translateX(0) scaleX(1)';
+                    this.overlay.style.filter = 'none';
+                }, 100);
+            }
+        }
+
+        // ======================== INITIALIZATION ========================
+        const gameCanvas = document.getElementById('game-canvas');
+        const matrixCanvas = document.getElementById('matrix-rain');
+
+        // Initialize Matrix Rain
+        const matrixRain = new MatrixRain(matrixCanvas);
+
+        // Handle window resize for Matrix Rain
+        window.addEventListener('resize', () => {
+            matrixRain.resize();
+        });
+
+        // Matrix Rain Animation Loop
+        function animateMatrix() {
+            matrixRain.draw();
+            requestAnimationFrame(animateMatrix);
+        }
+        animateMatrix();
+
+        // Set canvas size
+        gameCanvas.width = CONFIG.canvasWidth;
+        gameCanvas.height = CONFIG.canvasHeight;
+
+        // Create game instance
+        const game = new SnakeGame(gameCanvas, CONFIG);
+
+        // Initialize glitch effect
+        const glitch = new GlitchEffect();
+        glitch.start();
+
+        // Trigger occasional glitch effects
+        setInterval(() => {
+            if (Math.random() > 0.7 && !game.isPaused && game.isRunning) {
+                glitch.trigger();
+            }
+        }, 2000);
+
+        // Start screen button event
+        document.getElementById('start-btn').addEventListener('click', () => {
+            game.startGame();
+        });
+
+        // Restart button event
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            game.restart();
+        });
+
+        // Also start game on any keypress from start screen
+        document.getElementById('start-screen').addEventListener('click', () => {
+            if (!game.isRunning) {
+                game.startGame();
+            }
+        });
+
+        // Keyboard support for start screen
+        document.addEventListener('keydown', (e) => {
+            if (!game.isRunning && !document.getElementById('start-screen').classList.contains('hidden')) {
+                game.startGame();
+            }
+        });
+
+        // Show start screen initially
+        // The start screen is visible by default in HTML
+
+        // ======================== FINAL NOTES ========================
+        // This Snake game features:
+        // - Full Matrix-style digital rain background effect
+        // - Neon green, cyan, and magenta color palette with glow effects
+        // - Glitch effects that trigger randomly
+        // - Scanline overlay for retro terminal feel
+        // - Pixelated canvas rendering for a retro look
+        // - Terminal-style UI with window controls
+        // - Score, high score (localStorage), and level display
+        // - Increasing difficulty as snake grows
+        // - Smooth keyboard controls (Arrow keys + WASD)
+        // - Pause functionality (P key)
+        // - Game over screen with final score and high score
+        // - Responsive design for desktop
+        // - Well-commented, clean code
+    </script>
+</body>
+</html>
