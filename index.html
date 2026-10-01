@@ -178,6 +178,21 @@ main{
 }
 .card-meta b{color:rgba(207,232,210,.75);font-weight:400}
 
+.card-warn{
+  display:inline-block;
+  margin-top:10px;
+  color:var(--magenta);
+  font-size:.66rem; letter-spacing:.14em; text-transform:uppercase;
+  text-decoration:none;
+  border-bottom:1px dashed rgba(255,46,196,.45);
+  padding-bottom:2px;
+  transition:text-shadow .15s ease, border-color .15s ease;
+}
+.card-warn:hover{
+  border-bottom-color:var(--magenta);
+  text-shadow:0 0 10px rgba(255,46,196,.6);
+}
+
 .play-btn{
   margin-top:18px;
   width:100%;
@@ -375,6 +390,7 @@ footer .key{color:var(--cyan)}
     <div class="card-index">03</div>
     <div class="card-model">Laguna S21</div>
     <div class="card-title">CYBER SNAKE • MATRIX</div>
+    <a class="card-warn" href="LagunaS21_snake-game.html" target="_blank" rel="noopener">⚠ did not work after 1 prompt iteration</a>
     <div class="card-meta"><span>size <b>45 KB</b></span><span>self-contained</span></div>
     <button class="play-btn" tabindex="-1">▶ Play</button>
   </article>
@@ -383,6 +399,7 @@ footer .key{color:var(--cyan)}
     <div class="card-index">04</div>
     <div class="card-model">Muse Glimmer</div>
     <div class="card-title">CYBER SNAKE // MATRIX</div>
+    <a class="card-warn" href="MuseGlimmer_index.html" target="_blank" rel="noopener">⚠ did not work after 1 prompt iteration</a>
     <div class="card-meta"><span>size <b>8 KB</b></span><span>self-contained</span></div>
     <button class="play-btn" tabindex="-1">▶ Play</button>
   </article>
@@ -550,8 +567,12 @@ Make the game visually impressive and atmospheric while remaining fully playable
   }
 
   document.querySelectorAll('.card').forEach(card => {
-    card.addEventListener('click', () => openGame(card));
+    card.addEventListener('click', e => {
+      if (e.target.classList.contains('card-warn')) return;
+      openGame(card);
+    });
     card.addEventListener('keydown', e => {
+      if (e.target.classList.contains('card-warn')) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGame(card); }
     });
   });
