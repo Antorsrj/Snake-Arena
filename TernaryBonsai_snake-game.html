@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEON SNAKE — Cyberpunk Edition</title>
+  <style>
+    /* ============================================
+       CSS RESET & BASE
+       ============================================ */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --neon-green: #00ff41;
+      --neon-green-dim: #00cc33;
+      --neon-cyan: #00d4ff;
+      --neon-magenta: #ff00ff;
+      --neon-red: #ff0040;
+      --dark-bg: #060608;
+      --dark-panel: #0a0a12;
+      --dark-panel-border: #1a1a2e;
+      --text-primary: #e0e0e0;
+      --text-dim: #5a5a7a;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--dark-bg);
+      font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+      color: var(--text-primary);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ============================================
+       MATRIX DIGITAL RAIN CANVAS (background)
+       ============================================ */
+    #rain-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.18;
+      pointer-events: none;
+    }
+
+    /* ============================================
+       SCANLINES OVERLAY
+       ============================================ */
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 999;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.025) 2px,
+        rgba(0, 255, 65, 0.025) 4px
+      );
+    }
+
+    /* ============================================
+       VIGNETTE OVERLAY
+       ============================================ */
+    .vignette {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(6, 6, 8, 0.7) 100%
+      );
+    }
+
+    /* ============================================
+       MAIN LAYOUT — cyber terminal wrapper
+       ============================================ */
+    .cyber-wrapper {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    /* ============================================
+       HEADER / TITLE WITH GLITCH
+       ============================================ */
+    .cyber-title {
+      position: relative;
+      font-size: clamp(1.6rem, 5vw, 2.8rem);
+      font-weight: 900;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: var(--neon-green);
+      text-shadow:
+        0 0 5px var(--neon-green),
+        0 0 15px var(--neon-green),
+        0 0 30px rgba(0, 255, 65, 0.5),
+        0 0 60px rgba(0, 255, 65, 0.2);
+      animation: glitchTitle 8s infinite;
+      text-align: center;
+    }
+
+    .cyber-title::before,
+    .cyber-title::after {
+      content: "NEON SNAKE";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .cyber-title::before {
+      color: var(--neon-cyan);
+      animation: glitchLayer1 4s infinite;
+      clip-path: inset(0 0 60% 0);
+      text-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    .cyber-title::after {
+      color: var(--neon-magenta);
+      animation: glitchLayer2 3.5s infinite;
+      clip-path: inset(60% 0 0 0);
+      text-shadow: 0 0 10px var(--neon-magenta);
+    }
+
+    @keyframes glitchLayer1 {
+      0%, 92%, 96%, 100% { transform: translate(0); }
+      93%, 94% { transform: translate(-3px, 2px); }
+      95% { transform: translate(3px, -1px); }
+    }
+
+    @keyframes glitchLayer2 {
+      0%, 90%, 95%, 100% { transform: translate(0); }
+      91%, 92% { transform: translate(2px, -2px); }
+      93% { transform: translate(-2px, 1px); }
+    }
+
+    /* ============================================
+       SCORE PANEL — cyber terminal look
+       ============================================ */
+    .score-panel {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .score-card {
+      background: var(--dark-panel);
+      border: 1px solid var(--dark-panel-border);
+      border-left: 3px solid var(--neon-green);
+      padding: 10px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .score-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+      animation: scoreSweep 3s infinite;
+    }
+
+    @keyframes scoreSweep {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    .score-label {
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 2px;
+    }
+
+    .score-value {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: var(--neon-green);
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-card.high {
+      border-left: 3px solid var(--neon-cyan);
+    }
+
+    .score-card.high .score-value {
+      color: var(--neon-cyan);
+      text-shadow: 0 0 8px rgba(0, 204, 255, 0.4);
+    }
+
+    .score-card.speed {
+      border-left: 3px solid var(--neon-magenta);
+    }
+
+    .score-card.speed .score-value {
+      color: var(--neon-magenta);
+      text-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
+    }
+
+    /* ============================================
+       GAME BOARD
+       ============================================ */
+    .board-container {
+      position: relative;
+      border: 2px solid var(--dark-panel-border);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow:
+        0 0 20px rgba(0, 255, 65, 0.06),
+        0 0 60px rgba(0, 255, 65, 0.02),
+        inset 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .board-container::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px;
+      right: -2px; bottom: -2px;
+      border: 1px solid var(--neon-green);
+      opacity: 0.4;
+      border-radius: 6px;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    #game-canvas {
+      display: block;
+      background: #05050a;
+      cursor: none;
+    }
+
+    /* ============================================
+       GAME OVER / OVERLAY SCREENS
+       ============================================ */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 8, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+      opacity: 1;
+      transition: opacity 0.4s ease;
+      gap: 12px;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-title {
+      font-size: clamp(1.8rem, 5vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .overlay-title.game-over {
+      color: var(--neon-red);
+      text-shadow: 0 0 15px rgba(255, 0, 64, 0.6);
+    }
+
+    .overlay-title.start {
+      color: var(--neon-green);
+      text-shadow: 0 0 15px rgba(0, 255, 65, 0.6);
+    }
+
+    .overlay-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+
+    .overlay-score {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+    }
+
+    .overlay-score .val {
+      color: var(--neon-green);
+      font-size: 2.4rem;
+      font-weight: bold;
+      display: inline-block;
+      text-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .btn-restart {
+      margin-top: 16px;
+      padding: 12px 36px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dark-bg);
+      background: var(--neon-green);
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .btn-restart::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .btn-restart:hover::before {
+      left: 100%;
+    }
+
+    .btn-restart:hover {
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+      transform: scale(1.04);
+    }
+
+    .btn-restart:active {
+      transform: scale(0.98);
+    }
+
+    /* ============================================
+       PAUSED INDICATOR
+       ============================================ */
+    .paused-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(6, 6, 8, 0.8);
+      border: 1px solid var(--neon-cyan);
+      padding: 4px 12px;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--neon-cyan);
+      z-index: 40;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .paused-badge.visible {
+      opacity: 1;
+    }
+
+    /* ============================================
+       CONTROLS HINT
+       ============================================ */
+    .controls-hint {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      font-size: 0.6rem;
+      background: var(--dark-panel);
+      border: 1px solid var(--dark-panel-border);
+      border-radius: 3px;
+      color: var(--text-dim);
+      font-weight: bold;
+    }
+
+    /* ============================================
+       NEON BLINK FOR NEW HIGH SCORE
+       ============================================ */
+    @keyframes neonPulse {
+      0%, 100% { text-shadow: 0 0 8px rgba(0, 204, 255, 0.4); }
+      50% { text-shadow: 0 0 20px rgba(0, 204, 255, 0.8), 0 0 40px rgba(0, 204, 255, 0.4); }
+    }
+
+    .new-high {
+      animation: neonPulse 1s infinite;
+    }
+
+    /* ============================================
+       RESPONSIVE ADJUSTMENTS
+       ============================================ */
+    @media (max-width: 700px) {
+      .cyber-wrapper {
+        gap: 12px;
+        padding: 12px;
+      }
+      .score-panel {
+        gap: 12px;
+      }
+      .score-card {
+        padding: 8px 16px;
+      }
+      .score-value {
+        font-size: 1.3rem;
+      }
+      .controls-hint {
+        font-size: 0.6rem;
+        gap: 8px;
+      }
+    }
+
+    @media (max-height: 600px) {
+      .cyber-title {
+        font-size: 1.3rem;
+        letter-spacing: 4px;
+      }
+      .controls-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Matrix Digital Rain Background -->
+  <canvas id="rain-canvas"></canvas>
+
+  <!-- Scanlines & Vignette overlays -->
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+
+  <!-- Main Game Container -->
+  <div class="cyber-wrapper">
+
+    <!-- Title -->
+    <div class="cyber-title">Neon Snake</div>
+
+    <!-- Score Panel -->
+    <div class="score-panel">
+      <div class="score-card">
+        <div class="score-label">Score</div>
+        <div class="score-value" id="score-display">0</div>
+      </div>
+      <div class="score-card speed">
+        <div class="score-label">Speed</div>
+        <div class="score-value" id="speed-display">1×</div>
+      </div>
+      <div class="score-card high">
+        <div class="score-label">Best</div>
+        <div class="score-value" id="highscore-display">0</div>
+      </div>
+    </div>
+
+    <!-- Game Board with Overlays -->
+    <div class="board-container" id="board-container">
+      <div class="paused-badge" id="paused-badge">PAUSED</div>
+
+      <!-- Start Screen Overlay -->
+      <div class="overlay" id="start-overlay">
+        <div class="overlay-title start">Ready?</div>
+        <div class="overlay-subtitle">Eat nodes to grow. Don't crash.</div>
+        <button class="btn-restart" id="btn-start">▶ Start</button>
+      </div>
+
+      <!-- Game Over Overlay -->
+      <div class="overlay hidden" id="gameover-overlay">
+        <div class="overlay-title game-over">System Failed</div>
+        <div class="overlay-subtitle">Connection severed</div>
+        <div class="overlay-score">Final Score: <span class="val" id="final-score">0</span></div>
+        <div class="overlay-score" id="new-high-score" style="display:none; color:var(--neon-cyan);">★ New High Score ★</div>
+        <button class="btn-restart" id="btn-restart">⟳ Reboot</button>
+      </div>
+    </div>
+
+    <!-- Controls Hint -->
+    <div class="controls-hint">
+      <span>Move: <span class="key">↑</span><span class="key">↓</span><span class="key">←</span><span class="key">→</span> or <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></span>
+      <span>Pause: <span class="key">Space</span></span>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ================================================================
+     *  NEON SNAKE — Matrix Cyberpunk Edition
+     *  A self-contained browser game with no external dependencies.
+     * ================================================================
+     */
+
+    // ─── CONFIGURATION ──────────────────────────────────────────
+    const CONFIG = {
+      // Grid dimensions
+      cols: 25,
+      rows: 20,
+
+      // Cell rendering size (pixels)
+      cellSize: 20,
+
+      // Base game speed in ms per tick
+      baseTickInterval: 140,
+      // Minimum tick interval (fastest speed)
+      minTickInterval: 55,
+      // How many points before speed increases
+      speedLevelPoints: 5,
+      // Tick interval reduction per speed level
+      tickReduction: 8,
+      // Starting snake length
+      startLength: 4,
+      // Food points
+      foodPoints: 10,
+
+      // Color palette (matches CSS variables)
+      colors: {
+        bg:        '#05050a',
+        snakeHead: '#00ff41',
+        snakeBody: '#00cc33',
+        snakeBodyDim: '#00a825',
+        food:      '#ff00ff',
+        foodGlow:  '#ff00ff',
+        grid:      '#0a0a12',
+        trail:     'rgba(0,255,65,0.06)'
+      }
+    };
+
+    // Derived from config
+    const canvasW = CONFIG.cols * CONFIG.cellSize;
+    const canvasH = CONFIG.rows * CONFIG.cellSize;
+
+    // ─── DOM REFERENCES ───────────────────────────────────────────
+    const canvas         = document.getElementById('game-canvas');
+    const ctx            = canvas.getContext('2d');
+    const rainCanvas     = document.getElementById('rain-canvas');
+    const rainCtx        = rainCanvas.getContext('2d');
+
+    // UI elements
+    const scoreEl        = document.getElementById('score-display');
+    const speedEl        = document.getElementById('speed-display');
+    const highScoreEl    = document.getElementById('highscore-display');
+    const finalScoreEl   = document.getElementById('final-score');
+    const newHighEl      = document.getElementById('new-high-score');
+    const startOverlay   = document.getElementById('start-overlay');
+    const gameOverOverlay = document.getElementById('gameover-overlay');
+    const pausedBadge    = document.getElementById('paused-badge');
+    const btnStart       = document.getElementById('btn-start');
+    const btnRestart     = document.getElementById('btn-restart');
+
+    // ─── GAME STATE ─────────────────────────────────────────────
+    let snake       = [];      // Array of {x, y} segments, head at index 0
+    let direction   = {x: 1, y: 0};   // Current movement direction
+    let nextDir     = {x: 1, y: 0};   // Buffered next direction (prevents 180° turns)
+    let food        = {x: 0, y: 0};   // Food position
+    let score       = 0;
+    let highScore   = parseInt(localStorage.getItem('neonSnakeHighScore')) || 0;
+    let speedLevel  = 1;
+    let tickInterval = CONFIG.baseTickInterval;
+    let lastTick    = 0;
+    let isRunning   = false;
+    let isPaused    = false;
+    let isGameOver  = false;
+    let foodPulse   = 0;          // For food glow animation
+    let lastTime    = 0;          // Last frame time (for smooth animations)
+    let foodSpawnDelay = 0;       // Delay before food appears (for dramatic effect)
+    let foodSpawnTimer = 0;       // Counter for spawn delay
+
+    // Trail particles for the snake body
+    let trailParticles = [];
+
+    // ─── INITIALIZATION ─────────────────────────────────────────
+    function init() {
+      // Set canvas dimensions
+      canvas.width  = canvasW;
+      canvas.height = canvasH;
+
+      // Display saved high score
+      highScoreEl.textContent = highScore;
+
+      // Start the Matrix rain background
+      initRain();
+
+      // Setup keyboard input
+      setupInput();
+
+      // Start the main game loop (handles both game tick and render)
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
+    }
+
+    /**
+     * Sets up keyboard event listeners for snake movement and controls.
+     */
+    function setupInput() {
+      document.addEventListener('keydown', handleKey);
+    }
+
+    function handleKey(e) {
+      // Prevent default for game keys to avoid scrolling
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','w','a','s','d','W','A','S','D'].includes(e.key)) {
+        e.preventDefault();
+      }
+
+      // Space bar: toggle pause (only during gameplay)
+      if (e.key === ' ' && isRunning && !isGameOver) {
+        togglePause();
+        return;
+      }
+
+      // Direction input — only process when game is running and not paused
+      if (!isRunning || isPaused || isGameOver) return;
+
+      switch (e.key) {
+        case 'ArrowUp':    case 'w': case 'W': directionInput(0, -1); break;
+        case 'ArrowDown':  case 's': case 'S': directionInput(0, 1);  break;
+        case 'ArrowLeft':  case 'a': case 'A': directionInput(-1, 0); break;
+        case 'ArrowRight': case 'd': case 'D': directionInput(1, 0);  break;
+        default: return;
+      }
+    }
+
+    /**
+     * Queues a new direction, preventing 180° reversals.
+     * Uses a buffered direction (nextDir) so rapid keypresses work correctly
+     * and the snake doesn't reverse into itself.
+     */
+    function directionInput(dx, dy) {
+      // Prevent 180° reversal: can't go opposite to current direction
+      if (dx === -direction.x && dy === -direction.y) return;
+
+      // Prevent redundant directions (already going that way)
+      if (dx === direction.x && dy === direction.y) return;
+
+      nextDir = {x: dx, y: dy};
+    }
+
+    /**
+     * Toggles the paused state of the game.
+     */
+    function togglePause() {
+      isPaused = !isPaused;
+      pausedBadge.classList.toggle('visible', isPaused);
+    }
+
+    // ─── GAME LOGIC ─────────────────────────────────────────────
+
+    /**
+     * Starts a new game with the snake at the center moving right.
+     */
+    function startGame() {
+      // Hide overlays
+      startOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      pausedBadge.classList.remove('visible');
+
+      // Reset state
+      resetGame();
+      isRunning = true;
+      isGameOver = false;
+      lastTick = performance.now();
+    }
+
+    /**
+     * Resets all game state to initial values.
+     */
+    function resetGame() {
+      // Initialize snake in the center, moving right
+      const startX = Math.floor(CONFIG.cols / 2);
+      const startY = Math.floor(CONFIG.rows / 2);
+      snake = [];
+      for (let i = 0; i < CONFIG.startLength; i++) {
+        snake.push({x: startX - i, y: startY});
+      }
+
+      direction = {x: 1, y: 0};
+      nextDir   = {x: 1, y: 0};
+      score     = 0;
+      speedLevel = 1;
+      tickInterval = CONFIG.baseTickInterval;
+      trailParticles = [];
+
+      // Update UI
+      updateScoreUI();
+      placeFood();
+    }
+
+    /**
+     * Places food at a random empty grid cell.
+     * Adds a short dramatic delay before food appears.
+     */
+    function placeFood() {
+      // Delay for dramatic effect — food appears after a short pause
+      foodSpawnDelay = 1;
+      foodSpawnTimer = 0;
+    }
+
+    function spawnFood() {
+      // Find all empty cells
+      const empty = [];
+      for (let x = 0; x < CONFIG.cols; x++) {
+        for (let y = 0; y < CONFIG.rows; y++) {
+          if (!snake.some(s => s.x === x && s.y === y)) {
+            empty.push({x, y});
+          }
+        }
+      }
+
+      if (empty.length === 0) {
+        // Theoretically impossible unless player fills the entire board
+        isGameOver = true;
+        return;
+      }
+
+      food = empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    /**
+     * Main game tick — called every tickInterval milliseconds.
+     * This is where the actual game logic (movement, collision, scoring) runs.
+     */
+    function gameTick() {
+      if (isPaused || isGameOver) return;
+
+      // Update direction from buffer
+      direction = {x: nextDir.x, y: nextDir.y};
+
+      // Compute new head position
+      const head = snake[0];
+      const newHead = {
+        x: head.x + direction.x,
+        y: head.y + direction.y
+      };
+
+      // --- Collision Detection ---
+
+      // Wall collision
+      if (newHead.x < 0 || newHead.x >= CONFIG.cols ||
+          newHead.y < 0 || newHead.y >= CONFIG.rows) {
+        endGame();
+        return;
+      }
+
+      // Self collision (skip tail tip since it will move)
+      for (let i = 0; i < snake.length - 1; i++) {
+        if (snake[i].x === newHead.x && snake[i].y === newHead.y) {
+          endGame();
+          return;
+        }
+      }
+
+      // --- Food Spawn Delay ---
+      if (foodSpawnDelay > 0) {
+        foodSpawnTimer++;
+        if (foodSpawnTimer >= foodSpawnDelay) {
+          foodSpawnDelay = 0;
+          spawnFood();
+        }
+        // Add a small particle effect for the delay
+      }
+
+      // --- Move Snake ---
+      // Add new head
+      snake.unshift(newHead);
+
+      // --- Check Food ---
+      if (newHead.x === food.x && newHead.y === food.y) {
+        // Ate food — grow the snake (don't remove tail)
+        score += CONFIG.foodPoints;
+
+        // Increase speed every N points
+        const newLevel = 1 + Math.floor(score / CONFIG.speedLevelPoints);
+        if (newLevel > speedLevel) {
+          speedLevel = newLevel;
+          tickInterval = Math.max(CONFIG.minTickInterval,
+            CONFIG.baseTickInterval - (speedLevel - 1) * CONFIG.tickReduction);
+        }
+
+        // Spawn new food
+        placeFood();
+
+        // Update UI
+        updateScoreUI();
+      } else {
+        // Remove tail (normal move)
+        snake.pop();
+      }
+    }
+
+    /**
+     * Ends the game and shows the game over screen.
+     */
+    function endGame() {
+      isGameOver = true;
+      isRunning = false;
+
+      // Check for new high score
+      let isNewHigh = false;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neonSnakeHighScore', highScore);
+        isNewHigh = true;
+      }
+
+      // Update high score display
+      highScoreEl.textContent = highScore;
+      if (isNewHigh) {
+        highScoreEl.classList.add('new-high');
+        setTimeout(() => highScoreEl.classList.remove('new-high'), 3000);
+      }
+
+      // Populate game over screen
+      finalScoreEl.textContent = score;
+      newHighEl.style.display = isNewHigh ? 'block' : 'none';
+
+      // Show overlay with a slight delay for dramatic effect
+      setTimeout(() => {
+        gameOverOverlay.classList.remove('hidden');
+      }, 400);
+    }
+
+    /**
+     * Updates the score panel UI elements.
+     */
+    function updateScoreUI() {
+      scoreEl.textContent = score;
+      speedEl.textContent = speedLevel + '×';
+    }
+
+    // ─── RENDERING ──────────────────────────────────────────────
+
+    /**
+     * Main game loop — called every animation frame (~60fps).
+     * Separates game logic (ticked periodically) from rendering (every frame).
+     * This allows smooth visual animations even when the game tick is slow.
+     */
+    function gameLoop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+
+      // ── Update Game Logic (periodically) ──
+      if (isRunning && !isPaused && !isGameOver) {
+        if (timestamp - lastTick >= tickInterval) {
+          gameTick();
+          lastTick = timestamp;
+        }
+      }
+
+      // ── Render ──
+      render(timestamp);
+      renderRain(timestamp);
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    /**
+     * Renders the full game scene: background, grid, food, snake, trail.
+     * Uses requestAnimationFrame timing for smooth visual updates.
+     */
+    function render(timestamp) {
+      // Clear canvas
+      ctx.fillStyle = CONFIG.colors.bg;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      // Draw subtle grid
+      drawGrid();
+
+      // Draw trail particles (fading afterimages behind snake body)
+      drawTrail();
+
+      // Draw food (only after spawn delay)
+      if (foodSpawnDelay <= 0) {
+        drawFood(timestamp);
+      }
+
+      // Draw snake
+      drawSnake();
+    }
+
+    /**
+     * Draws the subtle grid lines on the game board.
+     */
+    function drawGrid() {
+      ctx.strokeStyle = CONFIG.colors.grid;
+      ctx.lineWidth = 0.5;
+
+      // Vertical lines
+      for (let x = 0; x <= CONFIG.cols; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * CONFIG.cellSize, 0);
+        ctx.lineTo(x * CONFIG.cellSize, canvasH);
+        ctx.stroke();
+      }
+
+      // Horizontal lines
+      for (let y = 0; y <= CONFIG.rows; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * CONFIG.cellSize);
+        ctx.lineTo(canvasW, y * CONFIG.cellSize);
+        ctx.stroke();
+      }
+    }
+
+    /**
+     * Draws the snake with gradient body segments, glowing head,
+     * and directional indicators (eyes) on the head.
+     */
+    function drawSnake() {
+      const cs = CONFIG.cellSize;
+      const padding = 1; // Inner padding for each segment
+
+      // Draw body segments (from tail to head, so head renders on top)
+      for (let i = snake.length - 1; i >= 1; i--) {
+        const seg = snake[i];
+        const t = 1 - (i / snake.length); // 0 = tail, 1 = neck (closer to head)
+        const alpha = 0.3 + t * 0.7; // Fade tail, brighter neck
+        const glow = t > 0.7 ? 3 : 0;
+
+        // Gradient from head color to body color
+        const r = Math.round(0 + t * 0);
+        const g = Math.round(204 + t * 37); // 204 → 241
+        const b = Math.round(51 + t * (-26)); // 51 → 25
+
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.shadowColor = CONFIG.colors.snakeHead;
+        ctx.shadowBlur = glow;
+
+        // Rounded rectangle for each segment
+        roundRect(ctx,
+          seg.x * cs + padding,
+          seg.y * cs + padding,
+          cs - padding * 2,
+          cs - padding * 2,
+          3, true, false
+        );
+
+        ctx.shadowBlur = 0;
+      }
+
+      // Draw head with glow
+      const head = snake[0];
+      ctx.fillStyle = CONFIG.colors.snakeHead;
+      ctx.shadowColor = CONFIG.colors.snakeHead;
+      ctx.shadowBlur = 12;
+
+      roundRect(ctx,
+        head.x * cs + padding,
+        head.y * cs + padding,
+        cs - padding * 2,
+        cs - padding * 2,
+        4, true, false
+      );
+
+      ctx.shadowBlur = 0;
+
+      // Draw eyes on the head (directional indicators)
+      drawEyes(head, cs);
+    }
+
+    /**
+     * Draws small "eyes" on the snake head pointing in the direction of movement.
+     */
+    function drawEyes(head, cs) {
+      const cx = head.x * cs + cs / 2;
+      const cy = head.y * cs + cs / 2;
+      const eyeSize = 2;
+      const offset = 4;
+      const dx = direction.x;
+      const dy = direction.y;
+
+      // Perpendicular offset for eye positions
+      const perpX = -dy;
+      const perpY = dx;
+
+      const eye1x = cx + dx * offset + perpX * offset;
+      const eye1y = cy + dy * offset + perpY * offset;
+      const eye2x = cx + dx * offset - perpX * offset;
+      const eye2y = cy + dy * offset - perpY * offset;
+
+      ctx.fillStyle = '#0a0a12';
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(eye1x, eye1y, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(eye2x, eye2y, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    /**
+     * Draws the food with a pulsing neon glow effect.
+     * The food pulses between different sizes and glow intensities.
+     */
+    function drawFood(timestamp) {
+      const cs = CONFIG.cellSize;
+      const pulse = Math.sin(timestamp / 250) * 0.3 + 0.7; // 0.4 to 1.0
+      const cx = food.x * cs + cs / 2;
+      const cy = food.y * cs + cs / 2;
+      const baseRadius = (cs - 4) / 2 * pulse;
+
+      // Outer glow
+      ctx.fillStyle = CONFIG.colors.foodGlow;
+      ctx.shadowColor = CONFIG.colors.foodGlow;
+      ctx.shadowBlur = 15 + pulse * 10;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius + 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner bright core
+      ctx.fillStyle = '#fff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Magenta ring
+      ctx.strokeStyle = CONFIG.colors.food;
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    /**
+     * Draws fading trail particles behind the snake body segments.
+     * These create a glowing afterimage effect as the snake moves.
+     */
+    function drawTrail() {
+      // Generate new trail particles from body segments
+      for (let i = 1; i < snake.length; i++) {
+        const seg = snake[i];
+        trailParticles.push({
+          x: seg.x * CONFIG.cellSize + CONFIG.cellSize / 2,
+          y: seg.y * CONFIG.cellSize + CONFIG.cellSize / 2,
+          alpha: 0.15 * (i / snake.length),
+          size: CONFIG.cellSize * 0.4,
+          life: 1
+        });
+      }
+
+      // Update and draw existing particles
+      for (let i = trailParticles.length - 1; i >= 0; i--) {
+        const p = trailParticles[i];
+        p.life -= 0.02;
+        if (p.life <= 0) {
+          trailParticles.splice(i, 1);
+          continue;
+        }
+
+        ctx.fillStyle = `rgba(0, 255, 65, ${p.alpha * p.life})`;
+        ctx.shadowColor = CONFIG.colors.snakeHead;
+        ctx.shadowBlur = 4 * p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Keep particle count reasonable
+      if (trailParticles.length > 500) {
+        trailParticles.splice(0, trailParticles.length - 500);
+      }
+
+      ctx.shadowBlur = 0;
+    }
+
+    // ─── MATRIX DIGITAL RAIN ───────────────────────────────────
+
+    /**
+     * Initializes the Matrix rain animation canvas and generates initial characters.
+     */
+    function initRain() {
+      // Set rain canvas to window size
+      resizeRainCanvas();
+      window.addEventListener('resize', resizeRainCanvas);
+
+      // Initialize rain columns
+      rainChars = [];
+      const cols = Math.ceil(window.innerWidth / 3);
+      for (let i = 0; i < cols; i++) {
+        rainChars.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          speed: 0.5 + Math.random() * 2,
+          length: 3 + Math.floor(Math.random() * 8),
+          alpha: 0.3 + Math.random() * 0.5,
+          text: generateRainChar()
+        });
+      }
+    }
+
+    /**
+     * Resizes the rain canvas to match window dimensions.
+     */
+    function resizeRainCanvas() {
+      rainCanvas.width = window.innerWidth;
+      rainCanvas.height = window.innerHeight;
+    }
+
+    /**
+     * Renders the Matrix digital rain on the background canvas.
+     * Each column of characters falls at a different speed, creating the
+     * classic "falling code" effect seen in The Matrix.
+     */
+    function renderRain(timestamp) {
+      rainCtx.fillStyle = 'rgba(6, 6, 8, 0.08)';
+      rainCtx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+
+      const fontSize = 12;
+
+      for (const char of rainChars) {
+        char.y += char.speed;
+
+        // Reset character when it falls off screen
+        if (char.y > rainCanvas.height - fontSize * char.length) {
+          char.y = -fontSize * char.length;
+          char.text = generateRainChar();
+        }
+
+        // Draw each character in the column
+        for (let i = 0; i < char.length; i++) {
+          const y = char.y + i * fontSize;
+          // Fade: bottom characters brighter, top fade to transparency
+          const alpha = char.alpha * (1 - i / char.length);
+
+          if (alpha > 0.05) {
+            rainCtx.fillStyle = `rgba(0, 255, 65, ${alpha})`;
+            rainCtx.fillText(char.text.charAt(i), char.x, y);
+          }
+        }
+      }
+    }
+
+    /**
+     * Generates a random Matrix-style rain character.
+     * Uses a mix of Japanese Katakana, hexadecimal digits, and symbols
+     * to replicate the "digital code" aesthetic.
+     */
+    function generateRainChar() {
+      const chars = '0123456789ABCDEFアアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワを';
+      let result = '';
+      for (let i = 0; i < 2; i++) {
+        result += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return result;
+    }
+
+    // ─── UTILITY FUNCTIONS ──────────────────────────────────────
+
+    /**
+     * Draws a rounded rectangle on the given canvas context.
+     * @param {CanvasRenderingContext2D} ctx - The drawing context
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {number} w - Width
+     * @param {number} h - Height
+     * @param {number} r - Corner radius
+     * @param {boolean} fill - Whether to fill the shape
+     * @param {boolean} stroke - Whether to stroke the outline
+     */
+    function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    // ─── BUTTON EVENT HANDLERS ──────────────────────────────────
+
+    btnStart.addEventListener('click', startGame);
+    btnRestart.addEventListener('click', startGame);
+
+    // Also allow Enter/Space to start/restart
+    document.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && !isRunning && !isPaused && !isGameOver) {
+        startGame();
+      }
+    });
+
+    // ─── BOOT ────────────────────────────────────────────────────
+    init();
+
+  </script>
+</body>
+</html>

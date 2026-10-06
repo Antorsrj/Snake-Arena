@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#060b0c">
+<title>NEON / SNAKE</title>
+<style>
+/* Todos os recursos são locais; as fontes usam a família monoespaçada do sistema. */
+:root{color-scheme:dark;--verde:#a6ff39;--ciano:#37e9ec;--rosa:#ff53bb;--fundo:#060b0c;--texto:#e3f0e8;--suave:#83978e}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;background:var(--fundo);color:var(--texto);font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;display:grid;place-items:center;padding:30px 24px;overflow-x:hidden}
+button{font:inherit}button:focus-visible{outline:2px solid var(--ciano);outline-offset:5px}
+#chuva{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:.3;z-index:-2}
+body:before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 10%,#060b0ca6 80%);pointer-events:none;z-index:-1}
+body:after{content:"";position:fixed;inset:0;background:repeating-linear-gradient(transparent 0 3px,#0002 3px 4px);pointer-events:none;z-index:10;opacity:.32}
+main{width:min(1060px,100%)}.topo{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #a6ff392a;padding-bottom:19px;font-size:10px;letter-spacing:2px;color:var(--suave)}.marca{color:var(--verde);font-weight:bold}.ponto{display:inline-block;width:6px;height:6px;background:var(--verde);border-radius:50%;box-shadow:0 0 10px var(--verde);margin-right:10px}.online{color:var(--ciano)}
+header{margin:32px 0 24px;display:flex;justify-content:space-between;align-items:end;gap:20px}.sobretitulo{color:var(--ciano);font-size:10px;letter-spacing:3px;margin-bottom:12px}h1{font-size:clamp(35px,6vw,68px);line-height:1;letter-spacing:-4px;margin:0;font-weight:900}.barra{color:var(--rosa);font-weight:400}h1 span:last-child{color:var(--verde);text-shadow:0 0 25px #a6ff3933}.descricao{font-size:11px;color:var(--suave);line-height:1.8;margin:14px 0 0}.edicao{font-size:10px;color:var(--suave);text-align:right;line-height:1.9;letter-spacing:1px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 238px;gap:22px;align-items:start}.console{border:1px solid #a6ff3940;background:#07100eed;box-shadow:0 0 70px #64ff1707;position:relative}.console:before,.console:after{content:"";position:absolute;width:18px;height:18px;border-color:var(--verde);pointer-events:none;z-index:3}.console:before{left:-1px;top:-1px;border-left:2px solid;border-top:2px solid;color:var(--verde)}.console:after{right:-1px;bottom:-1px;border-right:2px solid;border-bottom:2px solid;color:var(--verde)}
+.linha-console{display:flex;justify-content:space-between;gap:12px;padding:13px 16px;font-size:9px;letter-spacing:1.5px;color:var(--suave);border-bottom:1px solid #a6ff3920}.linha-console strong{color:var(--verde);font-weight:400}.area{position:relative;aspect-ratio:1;background:#07100e;margin:15px}#jogo{display:block;width:100%;height:100%}.rodape-console{border-top:1px solid #a6ff3920;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:9px;color:var(--suave);letter-spacing:1px}.tecla-pausa{background:none;border:0;color:var(--ciano);cursor:pointer;font-size:9px;padding:5px}.tecla-pausa:disabled{opacity:.35;cursor:default}
+.painel{display:grid;gap:14px}.cartao{border:1px solid #ffffff16;background:#0b1211ef;padding:20px}.rotulo{font-size:9px;letter-spacing:2px;color:var(--suave)}.numero{font-size:48px;letter-spacing:-3px;font-weight:700;line-height:1.2;margin-top:9px;color:var(--verde);text-shadow:0 0 24px #a6ff3925}.recorde{display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid #ffffff12;margin-top:14px;padding-top:14px}.recorde strong{font-size:19px;color:var(--ciano)}.nivel{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:13px}.nivel strong{color:var(--rosa)}.medidor{display:flex;gap:4px;margin-top:13px}.medidor i{height:5px;flex:1;background:#ff53bb20}.medidor i.aceso{background:var(--rosa);box-shadow:0 0 8px #ff53bb50}.ajuda{font-size:10px;line-height:1.8;color:var(--suave)}.teclas{display:grid;grid-template-columns:repeat(3,29px);gap:5px;justify-content:center;margin:19px 0 12px}kbd{font:11px inherit;display:grid;place-items:center;border:1px solid #37e9ec44;border-bottom-width:3px;border-radius:3px;height:28px;color:var(--ciano);background:#37e9ec08}.teclas kbd:first-child{grid-column:2}.teclas kbd:nth-child(2){grid-column:1}.ajuda p{margin:7px 0}.legenda{display:flex;align-items:center;gap:10px;margin-top:15px;font-size:9px;color:var(--suave)}.alimento{width:9px;height:9px;background:var(--rosa);box-shadow:0 0 12px var(--rosa);transform:rotate(45deg)}.nota{color:#52675e;font-size:9px;line-height:1.9;padding:0 3px}
+.sobreposicao{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:22px;background:#06100ddb;backdrop-filter:blur(4px);z-index:2}.sobreposicao[hidden]{display:none}.simbolo{font-size:45px;color:var(--verde);text-shadow:0 0 20px #a6ff3950;letter-spacing:-9px;padding-right:9px;margin-bottom:25px}.etiqueta{color:var(--ciano);font-size:9px;letter-spacing:3px;margin-bottom:15px}.titulo-overlay{font-size:clamp(25px,4vw,42px);font-weight:900;letter-spacing:-2px;margin:0;position:relative}.titulo-overlay:after{content:attr(data-texto);position:absolute;inset:0;color:var(--rosa);opacity:0;animation:glitch 7s infinite;clip-path:inset(35% 0 45% 0)}.sub-overlay{font-size:11px;color:var(--suave);line-height:1.8;max-width:300px;margin:16px 0 26px}.iniciar{background:var(--verde);border:1px solid var(--verde);color:#091005;font-weight:bold;font-size:11px;letter-spacing:1px;padding:16px 25px;cursor:pointer;box-shadow:0 0 25px #a6ff391c;transition:box-shadow .2s,transform .2s}.iniciar:hover{box-shadow:0 0 35px #a6ff3950;transform:translateY(-2px)}.dica{font-size:9px;color:#61766b;margin-top:15px}.base{display:flex;justify-content:space-between;gap:20px;margin-top:19px;color:#5d7167;font-size:9px;letter-spacing:1px}.base span:last-child{color:var(--ciano)}
+@keyframes glitch{0%,93%,97%,100%{opacity:0;transform:none}94%,96%{opacity:.8;transform:translateX(4px)}95%{opacity:.8;transform:translateX(-4px)}}
+@media(max-width:760px){body{padding:20px 14px}.layout{grid-template-columns:1fr}.painel{grid-template-columns:1fr 1fr}.controles,.nota{display:none}.cartao{padding:15px}.numero{font-size:32px}.recorde{margin-top:8px;padding-top:8px}.edicao{display:none}header{margin-top:25px}h1{letter-spacing:-2px}.area{margin:10px}.base{font-size:8px}.topo{font-size:8px;letter-spacing:1px}}
+@media(prefers-reduced-motion:reduce){.titulo-overlay:after{animation:none}#chuva{opacity:.12}.iniciar{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="chuva" aria-hidden="true"></canvas>
+<main>
+ <div class="topo"><span class="marca"><span class="ponto"></span>ARCADE SYSTEMS</span><span class="online">● CONEXÃO LOCAL</span></div>
+ <header><div><div class="sobretitulo">PROTOCOLO 001 / JOGO CLÁSSICO</div><h1>NEON <span class="barra">/</span> <span>SNAKE</span></h1><p class="descricao">Entre na rede. Colete energia. Não toque nos limites.</p></div><div class="edicao">EST. 1976 → REPROGRAMADO<br>SEM FIM. SEM SAÍDA.</div></header>
+ <div class="layout">
+  <section class="console" aria-label="Jogo Snake">
+   <div class="linha-console"><span>ARENA_01 <strong>■</strong></span><span id="estado">AGUARDANDO CONEXÃO</span></div>
+   <div class="area">
+    <canvas id="jogo" aria-label="Arena do Snake. Use as setas ou WASD para mover; espaço para pausar."></canvas>
+    <div class="sobreposicao" id="overlay">
+     <div class="simbolo" aria-hidden="true">[&gt;_]</div><div class="etiqueta" id="etiqueta">SISTEMA PRONTO</div>
+     <h2 class="titulo-overlay" id="titulo" data-texto="INVADA A REDE">INVADA A REDE</h2>
+     <p class="sub-overlay" id="mensagem">Colete os núcleos de energia. A cada captura, a rede fica mais rápida.</p>
+     <button class="iniciar" id="iniciar">INICIAR CONEXÃO →</button><div class="dica" id="dica">ou pressione Enter</div>
+    </div>
+   </div>
+   <div class="rodape-console"><span>24 × 24 / LIMITES ATIVOS</span><button class="tecla-pausa" id="pausar" disabled>[ ESPAÇO ] PAUSAR</button></div>
+  </section>
+  <aside class="painel">
+   <section class="cartao"><div class="rotulo">ENERGIA COLETADA</div><div class="numero" id="pontos">0000</div><div class="recorde"><span class="rotulo">RECORDE</span><strong id="recorde">0000</strong></div></section>
+   <section class="cartao"><div class="rotulo">INTENSIDADE DA REDE</div><div class="nivel"><span>NÍVEL <strong id="nivel">01</strong></span><span id="velocidade">1.0×</span></div><div class="medidor" id="medidor" aria-hidden="true"></div><div class="legenda"><span class="alimento"></span>NÚCLEO DE ENERGIA / +10</div></section>
+   <section class="cartao controles"><div class="rotulo">COMANDOS DE ACESSO</div><div class="teclas" aria-hidden="true"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div><div class="ajuda"><p style="text-align:center">SETAS ou W A S D</p><p>Espaço / Esc <span style="float:right;color:var(--ciano)">Pausar</span></p><p>Enter <span style="float:right;color:var(--ciano)">Iniciar</span></p></div></section>
+   <div class="nota">// Evite paredes e o próprio corpo.<br>// Uma captura. Um pouco mais rápido.<br>// Seu recorde fica neste navegador.</div>
+  </aside>
+ </div>
+ <footer class="base"><span>FEITO DE CÓDIGO. MOVIDO A REFLEXOS.</span><span>OFFLINE READY ↗</span></footer>
+ <div id="anuncio" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>
+</main>
+<script>
+'use strict';
+// Simulação em passos fixos; desenho interpolado na frequência do monitor.
+const $ = id => document.getElementById(id);
+const tela = $('jogo'), contexto = tela.getContext('2d');
+const fundo = $('chuva'), tinta = fundo.getContext('2d');
+const TAMANHO = 24, CHAVE_RECORDE = 'neon-snake-recorde-v1';
+const movimentoReduzido = matchMedia('(prefers-reduced-motion: reduce)');
+let cobra = [], anterior = [], direcao = {x:1,y:0}, fila = [], comida;
+let modo = 'pronto', pontos = 0, recorde = 0, recordeInicial = 0;
+let acumulado = 0, ultimoTempo = 0, particulas = [], largura = 0;
+let colunas = [], larguraChuva = 0, alturaChuva = 0, ultimoChuva = 0;
+try { const salvo = Number(localStorage.getItem(CHAVE_RECORDE)); recorde = Number.isFinite(salvo) && salvo >= 0 ? Math.floor(salvo) : 0; } catch { /* O jogo também funciona com armazenamento bloqueado. */ }
+const intervalo = () => Math.max(58, 155 - (pontos / 10) * 2.5);
+const formatar = valor => String(valor).padStart(4,'0');
+
+function atualizarPainel(){
+ $('pontos').textContent = formatar(pontos); $('recorde').textContent = formatar(recorde);
+ const nivel = Math.min(10, 1 + Math.floor(pontos / 50));
+ $('nivel').textContent = String(nivel).padStart(2,'0');
+ $('velocidade').textContent = (155 / intervalo()).toFixed(1) + '×';
+ $('medidor').replaceChildren(...Array.from({length:10}, (_,i) => { const barra = document.createElement('i'); barra.className = i < nivel ? 'aceso' : ''; return barra; }));
+}
+
+// Escolher entre as casas vazias evita laços infinitos quando a arena está cheia.
+function gerarComida(){
+ const ocupadas = new Set(cobra.map(p => p.y*TAMANHO+p.x));
+ const livres = [];
+ for(let i=0;i<TAMANHO*TAMANHO;i++) if(!ocupadas.has(i)) livres.push(i);
+ if(!livres.length){ comida = null; terminar(true); return; }
+ const casa = livres[Math.floor(Math.random()*livres.length)];
+ comida = {x:casa%TAMANHO,y:Math.floor(casa/TAMANHO)};
+}
+function preparar(){
+ cobra = [{x:7,y:12},{x:6,y:12},{x:5,y:12},{x:4,y:12}];
+ anterior = cobra.map(p=>({...p})); direcao = {x:1,y:0}; fila = [];
+ pontos = 0; acumulado = 0; particulas = []; gerarComida(); atualizarPainel();
+}
+function iniciar(){
+ preparar(); recordeInicial = recorde; modo = 'jogando';
+ $('overlay').hidden = true; $('estado').textContent = 'CONEXÃO ATIVA';
+ $('pausar').disabled = false; $('pausar').textContent = '[ ESPAÇO ] PAUSAR';
+ $('anuncio').textContent = 'Jogo iniciado.'; ultimoTempo = performance.now();
+}
+function mostrarOverlay(titulo,mensagem,etiqueta,botao){
+ $('titulo').textContent = titulo; $('titulo').dataset.texto = titulo;
+ $('mensagem').textContent = mensagem; $('etiqueta').textContent = etiqueta;
+ $('iniciar').textContent = botao; $('overlay').hidden = false;
+ $('anuncio').textContent = titulo + '. ' + mensagem;
+}
+function pausar(){
+ if(modo === 'jogando'){
+  modo = 'pausado'; $('estado').textContent = 'CONEXÃO SUSPENSA';
+  $('pausar').textContent = '[ ESPAÇO ] CONTINUAR';
+  mostrarOverlay('TEMPO SUSPENSO','Respire. Sua próxima jogada pode esperar.','JOGO PAUSADO','CONTINUAR →');
+ } else if(modo === 'pausado'){
+  modo = 'jogando'; $('overlay').hidden = true; $('estado').textContent = 'CONEXÃO ATIVA';
+  $('pausar').textContent = '[ ESPAÇO ] PAUSAR'; ultimoTempo = performance.now();
+ }
+}
+function terminar(venceu = false){
+ modo = 'fim'; $('estado').textContent = venceu ? 'REDE DOMINADA' : 'SINAL PERDIDO'; $('pausar').disabled = true;
+ mostrarOverlay(venceu ? 'REDE DOMINADA' : 'CONEXÃO PERDIDA',
+  `Você coletou ${pontos} pontos. ${recorde > recordeInicial ? 'Novo recorde. Sua marca ficou na rede.' : 'Reconecte e desafie seu recorde.'}`,
+  venceu ? 'ARENA COMPLETA' : 'FIM DE JOGO','RECONECTAR →');
+}
+function avancar(){
+ if(fila.length) direcao = fila.shift();
+ const cabeca = {x:cobra[0].x+direcao.x,y:cobra[0].y+direcao.y};
+ const comeu = comida && cabeca.x===comida.x && cabeca.y===comida.y;
+ // A última casa pode ser ocupada se a cauda sair dela neste mesmo passo.
+ const corpo = comeu ? cobra : cobra.slice(0,-1);
+ if(cabeca.x<0 || cabeca.y<0 || cabeca.x>=TAMANHO || cabeca.y>=TAMANHO || corpo.some(p=>p.x===cabeca.x && p.y===cabeca.y)) { terminar(); return; }
+ anterior = cobra.map(p=>({...p})); cobra.unshift(cabeca);
+ if(comeu){
+  anterior.push({...anterior[anterior.length-1]}); pontos += 10;
+  for(let i=0;i<16;i++){const angulo=Math.random()*Math.PI*2; particulas.push({x:cabeca.x+.5,y:cabeca.y+.5,vx:Math.cos(angulo)*(2+Math.random()*4),vy:Math.sin(angulo)*(2+Math.random()*4),vida:1});}
+  if(pontos>recorde){recorde=pontos;try{localStorage.setItem(CHAVE_RECORDE,String(recorde));}catch{/* Armazenamento opcional. */}}
+  atualizarPainel(); gerarComida();
+ } else cobra.pop();
+}
+
+function ajustar(){
+ const proporcao = Math.min(devicePixelRatio || 1,2);
+ largura = tela.getBoundingClientRect().width;
+ tela.width = Math.round(largura*proporcao); tela.height = tela.width;
+ contexto.setTransform(proporcao,0,0,proporcao,0,0);
+ larguraChuva = innerWidth; alturaChuva = innerHeight;
+ fundo.width = Math.round(larguraChuva*proporcao); fundo.height = Math.round(alturaChuva*proporcao);
+ tinta.setTransform(proporcao,0,0,proporcao,0,0);
+ colunas = Array.from({length:Math.ceil(larguraChuva/22)},()=>Math.random()*alturaChuva/20);
+ desenharChuva();
+}
+function desenharChuva(){
+ tinta.fillStyle = 'rgba(6,11,12,.12)'; tinta.fillRect(0,0,larguraChuva,alturaChuva);
+ tinta.font = '13px monospace';
+ const letras = '01アイウエオカキクケコサシスセソ<>/{}';
+ colunas.forEach((y,i)=>{
+  tinta.fillStyle = Math.random()>.97 ? '#a6ff39' : '#137c49';
+  tinta.fillText(letras[Math.floor(Math.random()*letras.length)],i*22,y*20);
+  colunas[i] = y*20>alturaChuva && Math.random()>.975 ? -Math.random()*20 : y+.55;
+ });
+}
+function desenhar(tempo,delta){
+ const c = contexto, unidade = largura/TAMANHO;
+ c.clearRect(0,0,largura,largura); c.strokeStyle = '#8ae8a309'; c.lineWidth = 1;
+ c.beginPath(); for(let i=0;i<=TAMANHO;i++){let p=i*unidade;c.moveTo(p,0);c.lineTo(p,largura);c.moveTo(0,p);c.lineTo(largura,p);} c.stroke();
+ if(comida){
+  const x=(comida.x+.5)*unidade,y=(comida.y+.5)*unidade;
+  const pulso=movimentoReduzido.matches ? 1 : 1+Math.sin(tempo/180)*.12;
+  c.save();c.translate(x,y);c.rotate(Math.PI/4);c.shadowColor='#ff53bb';c.shadowBlur=19;
+  c.fillStyle='#ff53bb';const lado=unidade*.48*pulso;c.fillRect(-lado/2,-lado/2,lado,lado);
+  c.shadowBlur=0;c.strokeStyle='#ff53bb35';c.strokeRect(-unidade*.48,-unidade*.48,unidade*.96,unidade*.96);c.restore();
+ }
+ const fracao = modo==='fim' ? 1 : Math.min(1,acumulado/intervalo());
+ for(let i=cobra.length-1;i>=0;i--){
+  const p=cobra[i],a=anterior[i]||p,x=(a.x+(p.x-a.x)*fracao)*unidade,y=(a.y+(p.y-a.y)*fracao)*unidade;
+  c.shadowColor='#a6ff39';c.shadowBlur=i===0?16:5;c.fillStyle=i===0?'#d5ff89':`hsl(${91+i/cobra.length*45},90%,${57-i/cobra.length*23}%)`;
+  c.fillRect(x+1.5,y+1.5,unidade-3,unidade-3);c.shadowBlur=0;
+  if(i===0){
+   c.fillStyle='#092314';const oe=unidade*.19, av=unidade*.2;
+   for(const sinal of [-1,1]){const ex=x+unidade/2+direcao.x*av-direcao.y*oe*sinal,ey=y+unidade/2+direcao.y*av+direcao.x*oe*sinal;c.fillRect(ex-1.5,ey-1.5,3,3);}
+  }
+ }
+ particulas = particulas.filter(p=>p.vida>0);
+ for(const p of particulas){if(modo==='jogando'){p.x+=p.vx*delta/1000;p.y+=p.vy*delta/1000;p.vida-=delta/550;}c.globalAlpha=Math.max(0,p.vida);c.fillStyle='#ff53bb';c.fillRect(p.x*unidade,p.y*unidade,2,2);}c.globalAlpha=1;
+}
+function quadro(tempo){
+ const delta = Math.min(tempo-(ultimoTempo||tempo),100); ultimoTempo=tempo;
+ if(modo==='jogando'){
+  acumulado+=delta;
+  while(modo==='jogando' && acumulado>=intervalo()) {const duracao=intervalo();acumulado-=duracao;avancar();}
+ }
+ desenhar(tempo,delta);
+ if(!movimentoReduzido.matches && tempo-ultimoChuva>65){desenharChuva();ultimoChuva=tempo;}
+ requestAnimationFrame(quadro);
+}
+
+// Duas entradas enfileiradas permitem curvas rápidas sem inverter sobre o corpo.
+const teclas = {arrowup:{x:0,y:-1},w:{x:0,y:-1},arrowdown:{x:0,y:1},s:{x:0,y:1},arrowleft:{x:-1,y:0},a:{x:-1,y:0},arrowright:{x:1,y:0},d:{x:1,y:0}};
+window.addEventListener('keydown',evento=>{
+ if(evento.ctrlKey||evento.metaKey||evento.altKey) return;
+ const tecla=evento.key.toLowerCase();
+ if(teclas[tecla] || [' ','escape','enter'].includes(tecla)) evento.preventDefault();
+ if(evento.repeat) return;
+ if(tecla==='enter'){if(modo==='pronto'||modo==='fim') iniciar();else if(modo==='pausado') pausar();return;}
+ if(tecla===' '||tecla==='escape'){pausar();return;}
+ const nova=teclas[tecla];
+ if(!nova || modo!=='jogando' || fila.length>=2) return;
+ const ultima=fila.length?fila[fila.length-1]:direcao;
+ if(nova.x===ultima.x && nova.y===ultima.y || nova.x===-ultima.x && nova.y===-ultima.y) return;
+ fila.push(nova);
+});
+$('iniciar').addEventListener('click',()=>modo==='pausado'?pausar():iniciar());
+$('pausar').addEventListener('click',pausar);
+// Sair da aba ou da janela pausa automaticamente a partida.
+document.addEventListener('visibilitychange',()=>{if(document.hidden && modo==='jogando') pausar();});
+window.addEventListener('blur',()=>{if(modo==='jogando') pausar();});
+new ResizeObserver(ajustar).observe(tela.parentElement);
+window.addEventListener('resize',ajustar);
+preparar(); ajustar(); requestAnimationFrame(quadro);
+</script>
+</body>
+</html>

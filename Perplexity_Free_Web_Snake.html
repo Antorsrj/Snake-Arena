@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CYBER//SNAKE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+--bg: #020807;
+--panel: rgba(3, 18, 16, 0.86);
+--green: #39ff88;
+--green-soft: #0fcf68;
+--cyan: #00eaff;
+--magenta: #ff22c8;
+--text: #d9fff0;
+--muted: #6ea995;
+--danger: #ff3f74;
+--cell: min(4.6vw, 28px);
+}
+
+* {
+box-sizing: border-box;
+}
+
+html,
+body {
+margin: 0;
+min-height: 100%;
+background: var(--bg);
+color: var(--text);
+font-family: "Share Tech Mono", monospace;
+overflow-x: hidden;
+}
+
+body {
+display: grid;
+place-items: center;
+min-height: 100vh;
+padding: 24px;
+position: relative;
+isolation: isolate;
+}
+
+/* Matrix digital rain layer */
+#matrix {
+position: fixed;
+inset: 0;
+width: 100%;
+height: 100%;
+z-index: -3;
+opacity: 0.25;
+background: #010504;
+}
+
+/* Atmospheric color bloom */
+body::before {
+content: "";
+position: fixed;
+inset: -20%;
+z-index: -2;
+pointer-events: none;
+background:
+radial-gradient(circle at 15% 20%, rgba(0, 234, 255, 0.08), transparent 28%),
+radial-gradient(circle at 82% 70%, rgba(255, 34, 200, 0.08), transparent 30%),
+radial-gradient(circle at 50% 50%, rgba(57, 255, 136, 0.035), transparent 42%);
+animation: drift 12s ease-in-out infinite alternate;
+}
+
+/* CRT scanlines and vignette */
+body::after {
+content: "";
+position: fixed;
+inset: 0;
+z-index: 10;
+pointer-events: none;
+background:
+linear-gradient(rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.16) 50%),
+radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.48) 100%);
+background-size: 100% 4px, 100% 100%;
+mix-blend-mode: screen;
+opacity: 0.38;
+}
+
+.shell {
+width: min(94vw, 900px);
+position: relative;
+border: 1px solid rgba(57, 255, 136, 0.55);
+background: linear-gradient(135deg, rgba(4, 28, 23, 0.92), rgba(2, 9, 15, 0.9));
+box-shadow:
+0 0 0 1px rgba(0, 234, 255, 0.12),
+0 0 30px rgba(57, 255, 136, 0.12),
+inset 0 0 40px rgba(0, 234, 255, 0.035);
+clip-path: polygon(
+0 16px, 16px 0, calc(100% - 16px) 0, 100% 16px,
+100% calc(100% - 16px), calc(100% - 16px) 100%,
+16px 100%, 0 calc(100% - 16px)
+);
+}
+
+.shell::before,
+.shell::after {
+content: "";
+position: absolute;
+pointer-events: none;
+z-index: 2;
+}
+
+.shell::before {
+width: 65px;
+height: 2px;
+top: 9px;
+left: 27px;
+background: var(--cyan);
+box-shadow: 0 0 12px var(--cyan);
+}
+
+.shell::after {
+width: 2px;
+height: 52px;
+right: 9px;
+bottom: 28px;
+background: var(--magenta);
+box-shadow: 0 0 12px var(--magenta);
+}
+
+header {
+padding: 25px 28px 17px;
+display: flex;
+align-items: end;
+justify-content: space-between;
+gap: 18px;
+border-bottom: 1px solid rgba(57, 255, 136, 0.22);
+}
+
+.brand {
+position: relative;
+}
+
+.kicker {
+color: var(--cyan);
+font-size: 0.68rem;
+letter-spacing: 0.3em;
+margin-bottom: 7px;
+opacity: 0.9;
+}
+
+h1 {
+margin: 0;
+color: var(--green);
+font-family: "Orbitron", sans-serif;
+font-size: clamp(1.7rem, 5vw, 3.05rem);
+font-weight: 800;
+letter-spacing: 0.09em;
+text-shadow:
+2px 0 var(--magenta),
+-2px 0 var(--cyan),
+0 0 18px rgba(57, 255, 136, 0.72);
+animation: titleGlitch 5s infinite;
+}
+
+.status {
+display: flex;
+align-items: center;
+gap: 9px;
+color: var(--green);
+font-size: 0.75rem;
+letter-spacing: 0.1em;
+white-space: nowrap;
+}
+
+.status-dot {
+width: 9px;
+height: 9px;
+border-radius: 50%;
+background: var(--green);
+box-shadow: 0 0 9px var(--green);
+animation: pulse 1.25s infinite;
+}
+
+.hud {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 10px;
+padding: 16px 28px;
+}
+
+.metric {
+border-left: 2px solid var(--green-soft);
+padding: 7px 12px;
+background: rgba(0, 255, 130, 0.035);
+}
+
+.metric:nth-child(2) {
+border-color: var(--cyan);
+}
+
+.metric:nth-child(3) {
+border-color: var(--magenta);
+}
+
+.metric-label {
+display: block;
+color: var(--muted);
+font-size: 0.66rem;
+letter-spacing: 0.18em;
+margin-bottom: 5px;
+}
+
+.metric-value {
+color: var(--green);
+font-family: "Orbitron", sans-serif;
+font-size: clamp(1.05rem, 3vw, 1.45rem);
+text-shadow: 0 0 10px rgba(57, 255, 136, 0.5);
+}
+
+.metric:nth-child(2) .metric-value {
+color: var(--cyan);
+text-shadow: 0 0 10px rgba(0, 234, 255, 0.5);
+}
+
+.metric:nth-child(3) .metric-value {
+color: var(--magenta);
+text-shadow: 0 0 10px rgba(255, 34, 200, 0.5);
+}
+
+.game-wrap {
+padding: 5px 28px 24px;
+}
+
+.board-frame {
+width: fit-content;
+max-width: 100%;
+margin: 0 auto;
+padding: 12px;
+position: relative;
+border: 1px solid rgba(0, 234, 255, 0.53);
+background: rgba(0, 13, 13, 0.85);
+box-shadow:
+0 0 20px rgba(0, 234, 255, 0.1),
+inset 0 0 26px rgba(0, 234, 255, 0.04);
+}
+
+.board-frame::before,
+.board-frame::after {
+content: "";
+position: absolute;
+width: 48px;
+height: 5px;
+background: var(--magenta);
+box-shadow: 0 0 10px var(--magenta);
+}
+
+.board-frame::before {
+top: -3px;
+left: 20px;
+}
+
+.board-frame::after {
+right: 20px;
+bottom: -3px;
+background: var(--green);
+box-shadow: 0 0 10px var(--green);
+}
+
+canvas {
+display: block;
+width: min(100%, 560px);
+height: auto;
+aspect-ratio: 1;
+background:
+linear-gradient(rgba(0, 234, 255, 0.035) 1px, transparent 1px),
+linear-gradient(90deg, rgba(0, 234, 255, 0.035) 1px, transparent 1px),
+radial-gradient(circle at 50% 45%, rgba(0, 255, 140, 0.07), transparent 60%),
+#010908;
+background-size: calc(100% / 20) calc(100% / 20), calc(100% / 20) calc(100% / 20), 100% 100%, 100% 100%;
+border: 1px solid rgba(57, 255, 136, 0.28);
+image-rendering: pixelated;
+}
+
+.overlay {
+position: absolute;
+inset: 12px;
+display: grid;
+place-items: center;
+padding: 20px;
+background: rgba(1, 8, 7, 0.78);
+backdrop-filter: blur(3px);
+opacity: 0;
+visibility: hidden;
+transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.overlay.visible {
+opacity: 1;
+visibility: visible;
+}
+
+.overlay-card {
+width: min(100%, 390px);
+padding: 27px 24px;
+text-align: center;
+border: 1px solid var(--magenta);
+background: rgba(7, 10, 22, 0.94);
+box-shadow:
+0 0 24px rgba(255, 34, 200, 0.25),
+inset 0 0 20px rgba(255, 34, 200, 0.05);
+}
+
+.overlay-card h2 {
+margin: 0 0 12px;
+color: var(--magenta);
+font-family: "Orbitron", sans-serif;
+font-size: clamp(1.3rem, 5vw, 2rem);
+letter-spacing: 0.1em;
+text-shadow: 0 0 14px rgba(255, 34, 200, 0.8);
+}
+
+.overlay-card p {
+margin: 8px 0 21px;
+color: var(--text);
+font-size: 0.84rem;
+line-height: 1.6;
+}
+
+button {
+border: 1px solid var(--green);
+padding: 12px 21px;
+color: var(--green);
+background: rgba(57, 255, 136, 0.08);
+font: inherit;
+font-weight: bold;
+letter-spacing: 0.11em;
+cursor: pointer;
+transition: 0.2s ease;
+box-shadow: 0 0 12px rgba(57, 255, 136, 0.14);
+}
+
+button:hover,
+button:focus-visible {
+color: #001c0e;
+background: var(--green);
+box-shadow: 0 0 22px rgba(57, 255, 136, 0.7);
+outline: none;
+}
+
+footer {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+flex-wrap: wrap;
+padding: 0 28px 25px;
+color: var(--muted);
+font-size: 0.67rem;
+letter-spacing: 0.08em;
+}
+
+.controls {
+color: var(--cyan);
+}
+
+.insert {
+color: var(--magenta);
+}
+
+@keyframes pulse {
+50% { opacity: 0.35; transform: scale(0.72); }
+}
+
+@keyframes titleGlitch {
+0%, 93%, 100% { transform: translate(0); }
+94% { transform: translate(-2px, 1px); }
+95% { transform: translate(2px, -1px); }
+96% { transform: translate(-1px, 0); }
+}
+
+@keyframes drift {
+from { transform: translate3d(-1%, -1%, 0) rotate(0deg); }
+to { transform: translate3d(1%, 1%, 0) rotate(2deg); }
+}
+
+@media (max-width: 600px) {
+body {
+padding: 10px;
+}
+
+header {
+padding: 22px 17px 15px;
+align-items: start;
+flex-direction: column;
+}
+
+.hud {
+padding: 13px 17px;
+gap: 7px;
+}
+
+.metric {
+padding: 6px 8px;
+}
+
+.metric-label {
+font-size: 0.56rem;
+letter-spacing: 0.08em;
+}
+
+.game-wrap {
+padding: 4px 12px 19px;
+}
+
+.board-frame {
+padding: 8px;
+}
+
+.overlay {
+inset: 8px;
+}
+
+footer {
+padding: 0 17px 21px;
+font-size: 0.59rem;
+}
+}
+</style>
+</head>
+<body>
+<canvas id="matrix" aria-hidden="true"></canvas>
+
+<main class="shell">
+<header>
+<div class="brand">
+<div class="kicker">// NEURAL ARCADE SYSTEM :: ONLINE</div>
+<h1>CYBER//SNAKE</h1>
+</div>
+<div class="status">
+<span class="status-dot"></span>
+<span id="connectionStatus">LINK STABLE</span>
+</div>
+</header>
+
+<section class="hud" aria-label="Game statistics">
+<div class="metric">
+<span class="metric-label">CURRENT SCORE</span>
+<span class="metric-value" id="score">000000</span>
+</div>
+<div class="metric">
+<span class="metric-label">HIGH SCORE</span>
+<span class="metric-value" id="highScore">000000</span>
+</div>
+<div class="metric">
+<span class="metric-label">THREAT LEVEL</span>
+<span class="metric-value" id="level">01</span>
+</div>
+</section>
+
+<section class="game-wrap">
+<div class="board-frame">
+<canvas id="game" width="560" height="560" aria-label="Cyber Snake game board"></canvas>
+
+<div class="overlay visible" id="overlay">
+<div class="overlay-card">
+<h2 id="overlayTitle">SYSTEM READY</h2>
+<p id="overlayMessage">
+Navigate the digital serpent through the grid.
+
+Consume data nodes. Avoid the firewall.
+</p>
+<button id="actionButton" type="button">INITIALIZE RUN</button>
+</div>
+</div>
+</div>
+</section>
+
+<footer>
+<span class="controls">[ ARROW KEYS / W A S D] MOVE</span>
+<span class="insert">[ SPACE] PAUSE</span>
+<span>BUILD 2.0.77 // NO ESCAPE</span>
+</footer>
+</main>
+
+<script>
+(() => {
+"use strict";
+
+/* ------------------------------
+Matrix background animation
+------------------------------ */
+const matrixCanvas = document.getElementById("matrix");
+const matrixContext = matrixCanvas.getContext("2d");
+let matrixColumns = [];
+let matrixFontSize = 15;
+const matrixChars = "アァカサタナハマヤャラワガザダバパ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>[]{}#$%";
+
+function resizeMatrix() {
+const ratio = Math.min(window.devicePixelRatio || 1, 2);
+matrixCanvas.width = Math.floor(window.innerWidth * ratio);
+matrixCanvas.height = Math.floor(window.innerHeight * ratio);
+matrixCanvas.style.width = ${window.innerWidth}px;
+matrixCanvas.style.height = ${window.innerHeight}px;
+matrixContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+const columns = Math.ceil(window.innerWidth / matrixFontSize);
+matrixColumns = Array.from(
+{ length: columns },
+() => Math.floor(Math.random() * window.innerHeight / matrixFontSize)
+);
+}
+
+function drawMatrix() {
+matrixContext.fillStyle = "rgba(1, 5, 4, 0.075)";
+matrixContext.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+matrixContext.font = ${matrixFontSize}px "Share Tech Mono", monospace;
+
+matrixColumns.forEach((y, index) => {
+const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+const x = index * matrixFontSize;
+
+matrixContext.fillStyle = Math.random() > 0.96 ? "#b8ffe0" : "#16a765";
+matrixContext.fillText(char, x, y * matrixFontSize);
+
+if (y * matrixFontSize > window.innerHeight && Math.random() > 0.975) {
+matrixColumns[index] = 0;
+} else {
+matrixColumns[index] = y + 1;
+}
+});
+
+requestAnimationFrame(drawMatrix);
+}
+
+window.addEventListener("resize", resizeMatrix);
+resizeMatrix();
+drawMatrix();
+
+/* ------------------------------
+Snake game configuration
+------------------------------ */
+const gameCanvas = document.getElementById("game");
+const context = gameCanvas.getContext("2d");
+const gridSize = 20;
+const tileSize = gameCanvas.width / gridSize;
+const storageKey = "cyberSnakeHighScore";
+
+const scoreElement = document.getElementById("score");
+const highScoreElement = document.getElementById("highScore");
+const levelElement = document.getElementById("level");
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayMessage = document.getElementById("overlayMessage");
+const actionButton = document.getElementById("actionButton");
+const connectionStatus = document.getElementById("connectionStatus");
+
+let snake;
+let food;
+let direction;
+let queuedDirection;
+let score;
+let highScore = Number(localStorage.getItem(storageKey)) || 0;
+let level;
+let gameState = "ready";
+let lastTime = 0;
+let accumulator = 0;
+let particles = [];
+let pulse = 0;
+
+const baseSpeed = 150;
+const minSpeed = 62;
+
+highScoreElement.textContent = formatNumber(highScore);
+
+function formatNumber(value) {
+return String(value).padStart(6, "0");
+}
+
+function resetGame() {
+snake = [
+{ x: 10, y: 10 },
+{ x: 9, y: 10 },
+{ x: 8, y: 10 },
+{ x: 7, y: 10 }
+];
+
+direction = { x: 1, y: 0 };
+queuedDirection = { x: 1, y: 0 };
+score = 0;
+level = 1;
+accumulator = 0;
+particles = [];
+spawnFood();
+updateHud();
+}
+
+function spawnFood() {
+let candidate;
+
+do {
+candidate = {
+x: Math.floor(Math.random() * gridSize),
+y: Math.floor(Math.random() * gridSize)
+};
+} while (snake.some(segment => segment.x === candidate.x && segment.y === candidate.y));
+
+food = candidate;
+}
+
+function updateHud() {
+scoreElement.textContent = formatNumber(score);
+highScoreElement.textContent = formatNumber(highScore);
+levelElement.textContent = String(level).padStart(2, "0");
+}
+
+function currentStepTime() {
+return Math.max(minSpeed, baseSpeed - (level - 1) * 8);
+}
+
+function startGame() {
+resetGame();
+gameState = "running";
+overlay.classList.remove("visible");
+connectionStatus.textContent = "LINK STABLE";
+lastTime = performance.now();
+requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+gameState = "over";
+
+if (score > highScore) {
+highScore = score;
+localStorage.setItem(storageKey, String(highScore));
+connectionStatus.textContent = "NEW RECORD";
+} else {
+connectionStatus.textContent = "SIGNAL LOST";
+}
+
+updateHud();
+overlayTitle.textContent = "SIGNAL TERMINATED";
+overlayMessage.innerHTML =
+Final score: <span style="color:var(--green)">${formatNumber(score)}</span><br /> +
+The firewall consumed your path.;
+actionButton.textContent = "REBOOT SYSTEM";
+overlay.classList.add("visible");
+}
+
+function togglePause() {
+if (gameState === "running") {
+gameState = "paused";
+connectionStatus.textContent = "LINK PAUSED";
+overlayTitle.textContent = "SYSTEM PAUSED";
+overlayMessage.textContent = "The neural link is suspended.";
+actionButton.textContent = "RESUME RUN";
+overlay.classList.add("visible");
+} else if (gameState === "paused") {
+gameState = "running";
+connectionStatus.textContent = "LINK STABLE";
+overlay.classList.remove("visible");
+lastTime = performance.now();
+requestAnimationFrame(gameLoop);
+}
+}
+
+function setDirection(newDirection) {
+if (gameState !== "running") return;
+
+const isReverse =
+newDirection.x === -direction.x &&
+newDirection.y === -direction.y;
+
+if (!isReverse) {
+queuedDirection = newDirection;
+}
+}
+
+function gameLoop(timestamp) {
+if (gameState !== "running") return;
+
+const elapsed = Math.min(timestamp - lastTime, 100);
+lastTime = timestamp;
+accumulator += elapsed;
+
+while (accumulator >= currentStepTime()) {
+update();
+accumulator -= currentStepTime();
+}
+
+render(timestamp);
+requestAnimationFrame(gameLoop);
+}
+
+function update() {
+direction = queuedDirection;
+
+const head = snake;
+const nextHead = {
+x: head.x + direction.x,
+y: head.y + direction.y
+};
+
+const hitWall =
+nextHead.x < 0 ||
+nextHead.x >= gridSize ||
+nextHead.y < 0 ||
+nextHead.y >= gridSize;
+
+const willEat = nextHead.x === food.x && nextHead.y === food.y;
+const bodyToCheck = willEat ? snake : snake.slice(0, -1);
+const hitSelf = bodyToCheck.some(
+segment => segment.x === nextHead.x && segment.y === nextHead.y
+);
+
+if (hitWall || hitSelf) {
+burst(head.x * tileSize + tileSize / 2, head.y * tileSize + tileSize / 2, "#ff3f74");
+endGame();
+return;
+}
+
+snake.unshift(nextHead);
+
+if (willEat) {
+score += 10;
+level = Math.floor(score / 50) + 1;
+
+if (score > highScore) {
+highScore = score;
+localStorage.setItem(storageKey, String(highScore));
+}
+
+burst(
+food.x * tileSize + tileSize / 2,
+food.y * tileSize + tileSize / 2,
+"#ff22c8"
+);
+
+spawnFood();
+updateHud();
+} else {
+snake.pop();
+}
+
+particles = particles.filter(particle => {
+particle.x += particle.vx;
+particle.y += particle.vy;
+particle.life -= 0.035;
+return particle.life > 0;
+});
+}
+
+function burst(x, y, color) {
+for (let i = 0; i < 15; i++) {
+const angle = Math.random() * Math.PI * 2;
+const speed = 0.6 + Math.random() * 2.5;
+
+particles.push({
+x,
+y,
+vx: Math.cos(angle) * speed,
+vy: Math.sin(angle) * speed,
+size: 1 + Math.random() * 3,
+color,
+life: 1
+});
+}
+}
+
+function drawGlowRect(x, y, width, height, color, blur = 12) {
+context.save();
+context.shadowColor = color;
+context.shadowBlur = blur;
+context.fillStyle = color;
+context.fillRect(x, y, width, height);
+context.restore();
+}
+
+function render(timestamp) {
+pulse = Math.sin(timestamp / 220) * 0.5 + 0.5;
+
+context.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+// Subtle grid overlay.
+context.strokeStyle = "rgba(0, 234, 255, 0.045)";
+context.lineWidth = 1;
+
+for (let i = 0; i <= gridSize; i++) {
+const position = i * tileSize + 0.5;
+
+context.beginPath();
+context.moveTo(position, 0);
+context.lineTo(position, gameCanvas.height);
+context.stroke();
+
+context.beginPath();
+context.moveTo(0, position);
+context.lineTo(gameCanvas.width, position);
+context.stroke();
+}
+
+// Food node.
+const foodX = food.x * tileSize;
+const foodY = food.y * tileSize;
+const foodSize = tileSize * (0.36 + pulse * 0.08);
+const foodOffset = (tileSize - foodSize) / 2;
+
+drawGlowRect(
+foodX + foodOffset,
+foodY + foodOffset,
+foodSize,
+foodSize,
+"#ff22c8",
+16 );
+
+context.strokeStyle = "#ffd0f5";
+context.lineWidth = 1;
+context.strokeRect(foodX + foodOffset, foodY + foodOffset, foodSize, foodSize);
+
+// Snake body.
+snake.forEach((segment, index) => {
+const x = segment.x * tileSize;
+const y = segment.y * tileSize;
+const inset = index === 0 ? 2 : 4;
+const size = tileSize - inset * 2;
+const color = index === 0 ? "#b8ffe0" : "#39ff88";
+
+drawGlowRect(x + inset, y + inset, size, size, color, index === 0 ? 19 : 10);
+
+context.fillStyle = index === 0
+? "#effff8"
+: rgba(22, ${220 - Math.min(index * 5, 90)}, ${105 - Math.min(index * 2, 45)}, 0.95);
+
+context.fillRect(x + inset + 2, y + inset + 2, size - 4, size - 4);
+
+if (index === 0) {
+drawSnakeEyes(x, y);
+}
+});
+
+// Particle effects.
+particles.forEach(particle => {
+context.save();
+context.globalAlpha = particle.life;
+context.shadowColor = particle.color;
+context.shadowBlur = 10;
+context.fillStyle = particle.color;
+context.fillRect(particle.x, particle.y, particle.size, particle.size);
+context.restore();
+});
+}
+
+function drawSnakeEyes(x, y) {
+const eyeSize = 3;
+const eyeColor = "#001b13";
+
+context.fillStyle = eyeColor;
+
+if (direction.x !== 0) {
+const eyeX = direction.x > 0 ? x + tileSize - 8 : x + 5;
+context.fillRect(eyeX, y + 7, eyeSize, eyeSize);
+context.fillRect(eyeX, y + tileSize - 10, eyeSize, eyeSize);
+} else {
+const eyeY = direction.y > 0 ? y + tileSize - 8 : y + 5;
+context.fillRect(x + 7, eyeY, eyeSize, eyeSize);
+context.fillRect(x + tileSize - 10, eyeY, eyeSize, eyeSize);
+}
+}
+
+actionButton.addEventListener("click", () => {
+if (gameState === "paused") {
+togglePause();
+} else {
+startGame();
+}
+});
+
+document.addEventListener("keydown", event => {
+const key = event.key.toLowerCase();
+
+if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", " "].includes(key)) {
+event.preventDefault();
+}
+
+if (key === " ") {
+togglePause();
+return;
+}
+
+const directions = {
+arrowup: { x: 0, y: -1 },
+w: { x: 0, y: -1 },
+arrowdown: { x: 0, y: 1 },
+s: { x: 0, y: 1 },
+arrowleft: { x: -1, y: 0 },
+a: { x: -1, y: 0 },
+arrowright: { x: 1, y: 0 },
+d: { x: 1, y: 0 }
+};
+
+if (directions[key]) {
+if (gameState === "ready" || gameState === "over") {
+startGame();
+}
+
+setDirection(directions[key]);
+}
+});
+
+resetGame();
+render(0);
+})();
+</script>
+</body>
+</html>

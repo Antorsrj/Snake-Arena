@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBER_SNAKE // MATRIX_PROTOCOL</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@500;800;900&display=swap');
+
+        :root {
+            --neon-green: #00ff66;
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff0055;
+            --neon-yellow: #ffe600;
+            --dark-bg: #03080c;
+            --terminal-bg: rgba(6, 15, 23, 0.85);
+            --grid-color: rgba(0, 255, 102, 0.08);
+            --font-tech: 'Orbitron', monospace;
+            --font-code: 'Fira Code', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--dark-bg);
+            font-family: var(--font-code);
+            color: var(--neon-green);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #bg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.35;
+        }
+
+        /* CRT Scanline and Vignette Effects */
+        .crt-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.8) 100%);
+            background-size: 100% 4px, 100% 100%;
+        }
+
+        /* Glitch Animation Classes */
+        .glitch-text {
+            position: relative;
+            display: inline-block;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            clip: rect(0, 0, 0, 0);
+        }
+
+        .glitch-anim::before {
+            left: -2px;
+            text-shadow: 2px 0 var(--neon-pink);
+            animation: glitch-anim-1 2s infinite linear alternate-reverse;
+        }
+
+        .glitch-anim::after {
+            left: 2px;
+            text-shadow: -2px 0 var(--neon-cyan);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim-1 {
+            0% { clip: rect(20px, 9999px, 15px, 0); }
+            20% { clip: rect(50px, 9999px, 80px, 0); }
+            40% { clip: rect(10px, 9999px, 40px, 0); }
+            60% { clip: rect(70px, 9999px, 30px, 0); }
+            80% { clip: rect(30px, 9999px, 60px, 0); }
+            100% { clip: rect(90px, 9999px, 10px, 0); }
+        }
+
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(80px, 9999px, 10px, 0); }
+            25% { clip: rect(10px, 9999px, 50px, 0); }
+            50% { clip: rect(40px, 9999px, 20px, 0); }
+            75% { clip: rect(60px, 9999px, 90px, 0); }
+            100% { clip: rect(30px, 9999px, 40px, 0); }
+        }
+
+        .cyber-container {
+            position: relative;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw;
+            max-height: 95vh;
+            padding: 20px;
+            background: var(--terminal-bg);
+            border: 1px solid var(--neon-green);
+            box-shadow: 0 0 25px rgba(0, 255, 102, 0.2), inset 0 0 15px rgba(0, 255, 102, 0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+        }
+
+        .terminal-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(0, 255, 102, 0.3);
+            font-family: var(--font-tech);
+        }
+
+        .title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #fff;
+        }
+
+        .audio-toggle {
+            background: transparent;
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 4px 10px;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .audio-toggle:hover, .audio-toggle.active {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        /* HUD Display */
+        .hud-panel {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-family: var(--font-tech);
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 255, 102, 0.4);
+            padding: 8px 16px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 110px;
+        }
+
+        .hud-label {
+            font-size: 0.65rem;
+            color: #888;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--neon-green);
+            text-shadow: 0 0 8px var(--neon-green);
+        }
+
+        .hud-value.cyber-alt {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 8px var(--neon-cyan);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border: 2px solid var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            background: rgba(2, 8, 12, 0.95);
+        }
+
+        #game-canvas {
+            display: block;
+        }
+
+        /* Screen overlays (Start / Game Over) */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 8, 12, 0.88);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            transition: opacity 0.3s;
+        }
+
+        .overlay-title {
+            font-family: var(--font-tech);
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--neon-pink);
+            text-shadow: 0 0 15px var(--neon-pink);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .overlay-sub {
+            font-size: 0.9rem;
+            color: var(--neon-cyan);
+            margin-bottom: 25px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .cyber-btn {
+            font-family: var(--font-tech);
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 12px 30px;
+            background: transparent;
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            cursor: pointer;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.3);
+        }
+
+        .cyber-btn:hover {
+            background: var(--neon-green);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-green);
+            transform: translateY(-2px);
+        }
+
+        .cyber-btn:active {
+            transform: translateY(1px);
+        }
+
+        .touch-controls {
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+            width: 200px;
+            height: 150px;
+        }
+
+        .touch-btn {
+            background: rgba(0, 255, 102, 0.1);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            font-family: var(--font-tech);
+        }
+
+        .touch-btn:active {
+            background: var(--neon-green);
+            color: #000;
+        }
+
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 3; }
+
+        @media (max-width: 768px) {
+            .touch-controls {
+                display: grid;
+            }
+            .title {
+                font-size: 1.1rem;
+            }
+            .hud-value {
+                font-size: 1.1rem;
+            }
+            .hud-box {
+                padding: 6px 10px;
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="crt-overlay"></div>
+
+    <div class="cyber-container">
+        <div class="terminal-header">
+            <div class="title glitch-text glitch-anim" data-text="SYSTEM//SNAKE_v2.0">SYSTEM//SNAKE_v2.0</div>
+            <button id="audio-btn" class="audio-toggle">AUDIO: OFF</button>
+        </div>
+
+        <div class="hud-panel">
+            <div class="hud-box">
+                <span class="hud-label">DATA_NODES</span>
+                <span id="score-val" class="hud-value">0000</span>
+            </div>
+            <div class="hud-box">
+                <span class="hud-label">MULTIPLIER</span>
+                <span id="multiplier-val" class="hud-value cyber-alt">1.0x</span>
+            </div>
+            <div class="hud-box">
+                <span class="hud-label">MAX_RECORD</span>
+                <span id="highscore-val" class="hud-value">0000</span>
+            </div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="game-canvas"></canvas>
+
+            <div id="start-screen" class="overlay-screen">
+                <div class="overlay-title glitch-text" data-text="INITIALIZE">INITIALIZE</div>
+                <div class="overlay-sub">CORRUPT DATA STREAM DETECTED</div>
+                <button id="start-btn" class="cyber-btn">CONNECT // START</button>
+            </div>
+
+            <div id="gameover-screen" class="overlay-screen" style="display: none;">
+                <div class="overlay-title glitch-text glitch-anim" data-text="SYSTEM_CRASH">SYSTEM_CRASH</div>
+                <div id="final-score" class="overlay-sub">NODES COLLECTED: 0</div>
+                <button id="restart-btn" class="cyber-btn">REBOOT_CORE</button>
+            </div>
+        </div>
+
+        <div class="touch-controls">
+            <div id="btn-up" class="touch-btn">▲</div>
+            <div id="btn-left" class="touch-btn">◄</div>
+            <div id="btn-right" class="touch-btn">►</div>
+            <div id="btn-down" class="touch-btn">▼</div>
+        </div>
+    </div>
+
+    <script>
+        class CyberAudio {
+            constructor() {
+                this.ctx = null;
+                this.enabled = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playEatSound(isPowerUp = false) {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = isPowerUp ? 'triangle' : 'sine';
+                const startFreq = isPowerUp ? 400 : 300;
+                const endFreq = isPowerUp ? 1200 : 800;
+
+                osc.frequency.setValueAtTime(startFreq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(endFreq, this.ctx.currentTime + 0.12);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playMoveSound() {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.04);
+
+                gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.04);
+            }
+
+            playCrashSound() {
+                if (!this.enabled || !this.ctx) return;
+                // Synth Glitch Noise Buffer generator
+                const bufferSize = this.ctx.sampleRate * 0.4;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.4);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start();
+            }
+        }
+
+        const audioManager = new CyberAudio();
+
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        let drops = [];
+        const chars = '0123456789ABCDEFµΞΨΩ$#@&%*';
+
+        function initMatrixRain() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            const columns = Math.floor(bgCanvas.width / 18);
+            drops = Array(columns).fill(1);
+        }
+
+        function drawMatrixRain() {
+            bgCtx.fillStyle = 'rgba(3, 8, 12, 0.15)';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            bgCtx.fillStyle = '#00ff66';
+            bgCtx.font = '14px "Fira Code", monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                bgCtx.fillText(text, i * 18, drops[i] * 18);
+                if (drops[i] * 18 > bgCanvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        window.addEventListener('resize', initMatrixRain);
+        initMatrixRain();
+
+        const gameCanvas = document.getElementById('game-canvas');
+        const ctx = gameCanvas.getContext('2d');
+
+        const GRID_SIZE = 20;
+        let tileCountX = 20;
+        let tileCountY = 20;
+
+        let snake = [];
+        let velocity = { x: 0, y: 0 };
+        let nextVelocity = { x: 0, y: 0 };
+        let food = { x: 10, y: 10, type: 'normal' };
+        let particles = [];
+
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('cyber_snake_highscore')) || 0;
+        let gameLoopTimer = null;
+        let isGameOver = false;
+        let isGameStarted = false;
+        let speed = 120; // ms per update
+
+        function resizeGameCanvas() {
+            const containerWidth = Math.min(window.innerWidth - 40, 500);
+            const size = Math.floor(containerWidth / GRID_SIZE) * GRID_SIZE;
+            gameCanvas.width = size;
+            gameCanvas.height = size;
+            tileCountX = size / GRID_SIZE;
+            tileCountY = size / GRID_SIZE;
+        }
+
+        resizeGameCanvas();
+        window.addEventListener('resize', resizeGameCanvas);
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.radius = Math.random() * 3 + 1;
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw(context) {
+                context.save();
+                context.globalAlpha = Math.max(0, this.alpha);
+                context.fillStyle = this.color;
+                context.shadowColor = this.color;
+                context.shadowBlur = 8;
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fill();
+                context.restore();
+            }
+        }
+
+        function createParticles(pixelX, pixelY, color, count = 12) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(pixelX, pixelY, color));
+            }
+        }
+
+        function initGame() {
+            snake = [
+                { x: 5, y: 10 },
+                { x: 4, y: 10 },
+                { x: 3, y: 10 }
+            ];
+            velocity = { x: 1, y: 0 };
+            nextVelocity = { x: 1, y: 0 };
+            score = 0;
+            speed = 120;
+            isGameOver = false;
+            particles = [];
+            
+            updateHUD();
+            spawnFood();
+
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('gameover-screen').style.display = 'none';
+
+            if (gameLoopTimer) clearInterval(gameLoopTimer);
+            gameLoopTimer = setInterval(gameLoop, speed);
+        }
+
+        function spawnFood() {
+            let valid = false;
+            while (!valid) {
+                food.x = Math.floor(Math.random() * tileCountX);
+                food.y = Math.floor(Math.random() * tileCountY);
+                valid = !snake.some(segment => segment.x === food.x && segment.y === food.y);
+            }
+            // 20% chance to spawn special cyan power food node
+            food.type = Math.random() < 0.2 ? 'special' : 'normal';
+        }
+
+        function updateHUD() {
+            document.getElementById('score-val').innerText = String(score).padStart(4, '0');
+            document.getElementById('highscore-val').innerText = String(highScore).padStart(4, '0');
+            
+            const mult = (1 + (snake.length - 3) * 0.1).toFixed(1);
+            document.getElementById('multiplier-val').innerText = `${mult}x`;
+        }
+
+        function gameLoop() {
+            update();
+            render();
+        }
+
+        function update() {
+            if (isGameOver) return;
+
+            velocity = { ...nextVelocity };
+            const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
+
+            // Wall Collisions
+            if (head.x < 0 || head.x >= tileCountX || head.y < 0 || head.y >= tileCountY) {
+                triggerGameOver();
+                return;
+            }
+
+            // Self Collision
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                triggerGameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // Food collision check
+            if (head.x === food.x && head.y === food.y) {
+                const points = food.type === 'special' ? 30 : 10;
+                score += points;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('cyber_snake_highscore', highScore);
+                }
+
+                audioManager.playEatSound(food.type === 'special');
+
+                // Particle explosion at center of food block
+                const pX = food.x * GRID_SIZE + GRID_SIZE / 2;
+                const pY = food.y * GRID_SIZE + GRID_SIZE / 2;
+                const color = food.type === 'special' ? '#00f3ff' : '#00ff66';
+                createParticles(pX, pY, color, 16);
+
+                updateHUD();
+                spawnFood();
+
+                // Increase game speed dynamically as length grows
+                if (speed > 50 && score % 40 === 0) {
+                    clearInterval(gameLoopTimer);
+                    speed = Math.max(50, speed - 6);
+                    gameLoopTimer = setInterval(gameLoop, speed);
+                }
+            } else {
+                snake.pop();
+            }
+
+            // Update explosion particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function render() {
+            // Clear grid background
+            ctx.fillStyle = '#02080c';
+            ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            // Draw Subtle Grid Lines
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < gameCanvas.width; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, gameCanvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < gameCanvas.height; y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(gameCanvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Food Node
+            const foodPX = food.x * GRID_SIZE;
+            const foodPY = food.y * GRID_SIZE;
+            const foodColor = food.type === 'special' ? '#00f3ff' : '#00ff66';
+
+            ctx.save();
+            ctx.fillStyle = foodColor;
+            ctx.shadowColor = foodColor;
+            ctx.shadowBlur = 12;
+            ctx.fillRect(foodPX + 3, foodPY + 3, GRID_SIZE - 6, GRID_SIZE - 6);
+            ctx.restore();
+
+            // Draw Snake Body segments
+            snake.forEach((segment, index) => {
+                const sx = segment.x * GRID_SIZE;
+                const sy = segment.y * GRID_SIZE;
+                
+                ctx.save();
+                if (index === 0) {
+                    // Snake Head (Glow accent)
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = '#00ff66';
+                    ctx.shadowBlur = 15;
+                    ctx.fillRect(sx + 1, sy + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+                } else {
+                    // Snake Tail gradient effect
+                    const alpha = 1 - (index / snake.length) * 0.6;
+                    ctx.fillStyle = `rgba(0, 255, 102, ${alpha})`;
+                    ctx.shadowColor = '#00ff66';
+                    ctx.shadowBlur = 6;
+                    ctx.fillRect(sx + 2, sy + 2, GRID_SIZE - 4, GRID_SIZE - 4);
+                }
+                ctx.restore();
+            });
+
+            // Draw Particle effects
+            particles.forEach(p => p.draw(ctx));
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            clearInterval(gameLoopTimer);
+            audioManager.playCrashSound();
+
+            // Head collision burst
+            if (snake.length > 0) {
+                const headX = snake[0].x * GRID_SIZE + GRID_SIZE / 2;
+                const headY = snake[0].y * GRID_SIZE + GRID_SIZE / 2;
+                createParticles(headX, headY, '#ff0055', 30);
+                render();
+            }
+
+            document.getElementById('final-score').innerText = `NODES COLLECTED: ${score}`;
+            document.getElementById('gameover-screen').style.display = 'flex';
+        }
+
+        function handleDirectionKey(dir) {
+            if (!isGameStarted || isGameOver) return;
+
+            switch (dir) {
+                case 'UP':
+                    if (velocity.y !== 1) { nextVelocity = { x: 0, y: -1 }; audioManager.playMoveSound(); }
+                    break;
+                case 'DOWN':
+                    if (velocity.y !== -1) { nextVelocity = { x: 0, y: 1 }; audioManager.playMoveSound(); }
+                    break;
+                case 'LEFT':
+                    if (velocity.x !== 1) { nextVelocity = { x: -1, y: 0 }; audioManager.playMoveSound(); }
+                    break;
+                case 'RIGHT':
+                    if (velocity.x !== -1) { nextVelocity = { x: 1, y: 0 }; audioManager.playMoveSound(); }
+                    break;
+            }
+        }
+
+        // Keyboard listeners
+        window.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W': handleDirectionKey('UP'); break;
+                case 'ArrowDown': case 's': case 'S': handleDirectionKey('DOWN'); break;
+                case 'ArrowLeft': case 'a': case 'A': handleDirectionKey('LEFT'); break;
+                case 'ArrowRight': case 'd': case 'D': handleDirectionKey('RIGHT'); break;
+            }
+        });
+
+        // Touch button controls
+        document.getElementById('btn-up').addEventListener('touchstart', (e) => { e.preventDefault(); handleDirectionKey('UP'); });
+        document.getElementById('btn-down').addEventListener('touchstart', (e) => { e.preventDefault(); handleDirectionKey('DOWN'); });
+        document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); handleDirectionKey('LEFT'); });
+        document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); handleDirectionKey('RIGHT'); });
+
+        // Touch Swipe Gesture Support
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        gameCanvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        gameCanvas.addEventListener('touchend', (e) => {
+            if (!touchStartX || !touchStartY) return;
+            const diffX = e.changedTouches[0].clientX - touchStartX;
+            const diffY = e.changedTouches[0].clientY - touchStartY;
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > 20) {
+                    handleDirectionKey(diffX > 0 ? 'RIGHT' : 'LEFT');
+                }
+            } else {
+                if (Math.abs(diffY) > 20) {
+                    handleDirectionKey(diffY > 0 ? 'DOWN' : 'UP');
+                }
+            }
+            touchStartX = 0;
+            touchStartY = 0;
+        }, { passive: true });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            audioManager.init();
+            isGameStarted = true;
+            initGame();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            initGame();
+        });
+
+        const audioBtn = document.getElementById('audio-btn');
+        audioBtn.addEventListener('click', () => {
+            audioManager.init();
+            audioManager.enabled = !audioManager.enabled;
+            audioBtn.innerText = `AUDIO: ${audioManager.enabled ? 'ON' : 'OFF'}`;
+            audioBtn.classList.toggle('active', audioManager.enabled);
+        });
+
+        // Continuous rendering animation loop for Matrix Rain
+        function animationFrameLoop() {
+            drawMatrixRain();
+            requestAnimationFrame(animationFrameLoop);
+        }
+
+        // Launch background animation on page load
+        animationFrameLoop();
+        updateHUD();
+    </script>
+</body>
+</html>

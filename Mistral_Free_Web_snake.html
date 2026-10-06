@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEON://SNAKE</title>
+<style>
+  /* ============================================================
+     NEON://SNAKE — Cyberpunk / Matrix Snake
+     Single-file game. No external dependencies.
+     ============================================================ */
+
+  /* ---------- Base / reset ---------- */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green:  #39ff14;
+    --cyan:   #00f0ff;
+    --magenta:#ff00c8;
+    --dark:   #020604;
+    --panel:  rgba(0, 20, 10, 0.72);
+    --mono: "Courier New", "Lucida Console", monospace;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--dark);
+    color: var(--green);
+    font-family: var(--mono);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  /* ---------- Matrix digital-rain background ---------- */
+  #rain {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: .55;
+  }
+
+  /* ---------- Scanline overlay (CRT vibe) ---------- */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 255, 120, 0.03) 3px,
+      rgba(0, 0, 0, 0.12) 4px
+    );
+    mix-blend-mode: overlay;
+  }
+
+  /* Subtle vignette */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+  }
+
+  /* ---------- Header / HUD ---------- */
+  header {
+    z-index: 10;
+    width: min(720px, 96vw);
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  h1 {
+    font-size: clamp(18px, 3vw, 26px);
+    color: var(--cyan);
+    text-shadow: 0 0 6px var(--cyan), 0 0 18px rgba(0,240,255,.5);
+    animation: flicker 4s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 92%, 96%, 100% { opacity: 1; }
+    93%, 95% { opacity: .55; }
+  }
+
+  .hud {
+    display: flex;
+    gap: 18px;
+    font-size: clamp(11px, 1.6vw, 14px);
+  }
+  .hud .label { color: var(--magenta); text-shadow: 0 0 8px var(--magenta); }
+  .hud .val   { color: var(--green);  text-shadow: 0 0 8px var(--green); }
+  .hud .val.hi { color: var(--cyan);  text-shadow: 0 0 8px var(--cyan); }
+
+  /* ---------- Game area ---------- */
+  #stage {
+    position: relative;
+    z-index: 10;
+    margin-top: 12px;
+  }
+
+  canvas#game {
+    display: block;
+    border: 1px solid var(--green);
+    box-shadow:
+      0 0 12px rgba(57,255,20,.55),
+      inset 0 0 24px rgba(57,255,20,.12);
+    background: rgba(0, 8, 3, 0.82);
+    image-rendering: pixelated;
+  }
+
+  /* ---------- Overlay screens (start / game over) ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(1, 5, 2, 0.82);
+    backdrop-filter: blur(2px);
+    text-align: center;
+    padding: 20px;
+  }
+
+  .overlay.hidden { display: none; }
+
+  .overlay h2 {
+    font-size: clamp(26px, 5vw, 44px);
+    color: var(--magenta);
+    text-shadow: 0 0 10px var(--magenta), 2px 2px 0 var(--cyan);
+    animation: glitch 1.6s infinite;
+  }
+
+  @keyframes glitch {
+    0%, 88%, 100% { transform: translate(0, 0); }
+    90% { transform: translate(-3px, 1px); }
+    92% { transform: translate(3px, -1px); }
+    94% { transform: translate(-2px, -2px); }
+  }
+
+  .overlay p { color: var(--cyan); font-size: clamp(11px, 1.8vw, 14px); letter-spacing: 1px; }
+  .overlay .keys { color: var(--green); opacity: .85; }
+
+  .blink { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- Footer hints ---------- */
+  footer {
+    z-index: 10;
+    margin-top: 10px;
+    font-size: clamp(10px, 1.4vw, 12px);
+    color: rgba(0, 240, 255, .6);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  footer b { color: var(--magenta); }
+
+  /* ---------- Responsive ---------- */
+  @media (max-height: 640px) {
+    header { margin-top: 6px; }
+    footer { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="rain"></canvas>
+
+<header>
+  <h1>NEON://SNAKE</h1>
+  <div class="hud">
+    <div><span class="label">SCORE&nbsp;</span><span class="val" id="score">0</span></div>
+    <div><span class="label">HIGH&nbsp;</span><span class="val hi" id="high">0</span></div>
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="game" width="640" height="640"></canvas>
+
+  <!-- Start screen -->
+  <div class="overlay" id="startScreen">
+    <h2>&gt;_ SYSTEM READY</h2>
+    <p class="keys">ARROWS / WASD TO MOVE &nbsp;·&nbsp; P TO PAUSE</p>
+    <p class="blink">[ PRESS ANY KEY TO JACK IN ]</p>
+  </div>
+
+  <!-- Game over screen -->
+  <div class="overlay hidden" id="overScreen">
+    <h2 id="overTitle">CONNECTION LOST</h2>
+    <p id="overMsg">SIGNAL TERMINATED</p>
+    <p class="blink">[ PRESS ENTER TO REBOOT ]</p>
+  </div>
+</div>
+
+<footer>COLLECT <b>DATA NODES</b> — AVOID YOUR OWN TRACE — SPEED INCREASES AS YOU GROW</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. MATRIX DIGITAL RAIN (background canvas)
+   ============================================================ */
+const rainCv = document.getElementById("rain");
+const rainCtx = rainCv.getContext("2d");
+const KATAKANA = "アイウエオカキクケコサシスセソタチツテトナニヌネノ01234567890ABCDEFXYZ$#@%&";
+
+let columns = [];   // y-offset of each rain column
+function resizeRain() {
+  rainCv.width = innerWidth;
+  rainCv.height = innerHeight;
+  const cols = Math.floor(innerWidth / 16);
+  columns = new Array(cols).fill(0).map(() => Math.random() * -50);
+}
+addEventListener("resize", resizeRain);
+resizeRain();
+
+function drawRain() {
+  // fade previous frame -> trails
+  rainCtx.fillStyle = "rgba(2, 6, 4, 0.08)";
+  rainCtx.fillRect(0, 0, rainCv.width, rainCv.height);
+  rainCtx.font = "14px monospace";
+
+  for (let i = 0; i < columns.length; i++) {
+    const x = i * 16;
+    const y = columns[i];
+    // random glyph
+    const ch = KATAKANA[Math.floor(Math.random() * KATAKANA.length)];
+    // bright leading glyph, occasionally tinted cyan/magenta
+    const r = Math.random();
+    rainCtx.fillStyle = r < 0.02 ? "#ff00c8" : r < 0.06 ? "#00f0ff" : "#39ff14";
+    rainCtx.fillText(ch, x, y * 16);
+    columns[i] = y * 16 > rainCv.height && Math.random() > 0.975 ? 0 : y + 1;
+  }
+  requestAnimationFrame(drawRain);
+}
+drawRain();
+
+/* ============================================================
+   2. GAME CONFIG & STATE
+   ============================================================ */
+const cv = document.getElementById("game");
+const ctx = cv.getContext("2d");
+const GRID = 20;                       // cells per side
+const CELL = cv.width / GRID;           // pixel size of a cell
+
+const startScreen = document.getElementById("startScreen");
+const overScreen  = document.getElementById("overScreen");
+const overTitle  = document.getElementById("overTitle");
+const overMsg    = document.getElementById("overMsg");
+const scoreEl    = document.getElementById("score");
+const highEl     = document.getElementById("high");
+
+let snake, dir, nextDir, food, score, tickMs, running, paused, growPulses;
+let state = "start";                    // "start" | "play" | "over" | "paused"
+let lastTick = 0;
+let foodPulse = 0;
+
+/* High score persistence */
+const HS_KEY = "neon_snake_highscore";
+let high = parseInt(localStorage.getItem(HS_KEY) || "0", 10);
+highEl.textContent = high;
+
+function reset() {
+  snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}];
+  dir = {x: 1, y: 0};
+  nextDir = {x: 1, y: 0};
+  score = 0;
+  growPulses = [];                      // visual eat-pulses
+  tickMs = 130;                         // ms per step; shrinks as snake grows
+  placeFood();
+  updateHUD();
+}
+
+function updateHUD() {
+  scoreEl.textContent = score;
+  highEl.textContent = high;
+}
+
+/* Random free cell for food (never inside the snake) */
+function placeFood() {
+  let x, y, occupied;
+  do {
+    x = Math.floor(Math.random() * GRID);
+    y = Math.floor(Math.random() * GRID);
+    occupied = snake.some(s => s.x === x && s.y === y);
+  } while (occupied);
+  food = {x, y};
+}
+
+/* Difficulty: speed ramps up as the snake gets longer (capped) */
+function stepInterval() {
+  return Math.max(55, 130 - (snake.length - 3) * 2.2);
+}
+
+/* ============================================================
+   3. INPUT
+   ============================================================ */
+const KEYMAP = {
+  ArrowUp: {x: 0, y: -1}, KeyW: {x: 0, y: -1},
+  ArrowDown: {x: 0, y: 1}, KeyS: {x: 0, y: 1},
+  ArrowLeft: {x: -1, y: 0}, KeyA: {x: -1, y: 0},
+  ArrowRight: {x: 1, y: 0}, KeyD: {x: 1, y: 0},
+};
+
+addEventListener("keydown", (e) => {
+  // Start / restart handling
+  if (state === "start") {
+    state = "play";
+    running = true;
+    lastTick = performance.now();
+    startScreen.classList.add("hidden");
+    return;
+  }
+  if (state === "over" && (e.key === "Enter" || e.key === " ")) {
+    reset();
+    state = "play";
+    overScreen.classList.add("hidden");
+    return;
+  }
+  if (e.code === "KeyP") {                 // pause toggle
+    if (state === "play") { state = "paused"; }
+    else if (state === "paused") { state = "play"; lastTick = performance.now(); }
+    return;
+  }
+  if (state !== "play") return;
+
+  const nd = KEYMAP[e.code];
+  if (!nd) return;
+  e.preventDefault();
+  // forbid 180° reversal against current direction
+  if (nd.x === -dir.x && nd.y === -dir.y) return;
+  nextDir = nd;
+});
+
+/* ============================================================
+   4. GAME STEP LOGIC
+   ============================================================ */
+function step() {
+  dir = nextDir;
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+  // wall collision
+  if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) return gameOver();
+  // self collision
+  if (snake.some(s => s.x === head.x && s.y === head.y)) return gameOver();
+
+  snake.unshift(head);
+
+  if (head.x === food.x && head.y === food.y) {
+    score += 10;
+    if (score > high) {
+      high = score;
+      localStorage.setItem(HS_KEY, String(high));
+    }
+    growPulses.push({x: food.x, y: food.y, r: 0});
+    placeFood();
+  } else {
+    snake.pop();                          // move without growing
+  }
+  tickMs = stepInterval();
+  updateHUD();
+}
+
+function gameOver() {
+  state = "over";
+  running = false;
+  overTitle.textContent = "CONNECTION LOST";
+  overMsg.textContent = score >= high && score > 0
+    ? "// NEW HIGH SCORE: " + score + " //"
+    : "SIGNAL TERMINATED — SCORE: " + score;
+  overScreen.classList.remove("hidden");
+}
+
+/* ============================================================
+   5. RENDERING
+   ============================================================ */
+function cellRect(c) { return {x: c.x * CELL, y: c.y * CELL}; }
+
+function draw(t) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  // faint grid
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.06)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < GRID; i++) {
+    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, cv.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(cv.width, i * CELL); ctx.stroke();
+  }
+
+  // food = magenta data node with pulsing glow
+  foodPulse = (Math.sin(t / 180) + 1) / 2;                     // 0..1
+  const f = cellRect(food);
+  ctx.save();
+  ctx.shadowColor = "#ff00c8";
+  ctx.shadowBlur = 14 + foodPulse * 10;
+  ctx.fillStyle = "#ff00c8";
+  const fr = CELL * 0.3 + foodPulse * 3;
+  ctx.beginPath();
+  ctx.arc(f.x + CELL / 2, f.y + CELL / 2, fr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // eat-pulse rings (expand + fade)
+  growPulses = growPulses.filter(p => p.r < CELL * 1.6);
+  for (const p of growPulses) {
+    const r = cellRect(p);
+    ctx.strokeStyle = `rgba(0, 240, 255, ${1 - p.r / (CELL * 1.6)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(r.x + CELL / 2, r.y + CELL / 2, p.r, 0, Math.PI * 2);
+    ctx.stroke();
+    p.r += 1.6;
+  }
+
+  // snake body: head cyan, body green gradient along its length
+  for (let i = snake.length - 1; i >= 0; i--) {
+    const s = cellRect(snake[i]);
+    const isHead = i === 0;
+    const fade = 1 - i / (snake.length + 4);   // tail dims a bit
+    ctx.save();
+    ctx.shadowColor = isHead ? "#00f0ff" : "#39ff14";
+    ctx.shadowBlur = isHead ? 16 : 8;
+    ctx.fillStyle = isHead
+      ? "#00f0ff"
+      : `rgba(57, 255, 20, ${(0.35 + fade * 0.55).toFixed(2)})`;
+    ctx.fillRect(s.x + 1, s.y + 1, CELL - 2, CELL - 2);
+    ctx.restore();
+  }
+
+  // head "eye" pixels facing the direction of travel
+  const h = cellRect(snake[0]);
+  ctx.fillStyle = "#020604";
+  const ex = h.x + CELL / 2 + dir.x * CELL * 0.22 - 3;
+  const ey = h.y + CELL / 2 + dir.y * CELL * 0.22 - 3;
+  ctx.fillRect(ex - dir.y * 4, ey - dir.x * 4, 3, 3);
+  ctx.fillRect(ex + dir.y * 4, ey + dir.x * 4, 3, 3);
+
+  // occasional glitch slice: shift a horizontal band of the canvas
+  if (Math.random() < 0.02) {
+    const gy = Math.random() * cv.height;
+    const gh = 4 + Math.random() * 14;
+    const dx = (Math.random() - 0.5) * 22;
+    try {
+      ctx.drawImage(cv, 0, gy, cv.width, gh, dx, gy, cv.width, gh);
+    } catch (e) { /* drawImage on own canvas is safe; ignore */
+    }
+  }
+
+  if (state === "paused") {
+    ctx.fillStyle = "rgba(1, 5, 2, 0.6)";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = "#ff00c8";
+    ctx.font = "28px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("|| PAUSED", cv.width / 2, cv.height / 2);
+  }
+}
+
+/* ============================================================
+   6. MAIN LOOP
+   ============================================================ */
+function loop(t) {
+  if (state === "play" && t - lastTick >= tickMs) {
+    lastTick = t;
+    step();
+  }
+  if (state !== "start") draw(t);
+  requestAnimationFrame(loop);
+}
+
+/* ---------- Responsive sizing: scale stage to fit viewport ---------- */
+function fitStage() {
+  const avail = Math.min(innerWidth * 0.96, innerHeight - 120, 720);
+  const scale = Math.max(0.4, Math.min(1, avail / cv.width));
+  cv.style.width = (cv.width * scale) + "px";
+  cv.style.height = (cv.height * scale) + "px";
+}
+addEventListener("resize", fitStage);
+
+fitStage();
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

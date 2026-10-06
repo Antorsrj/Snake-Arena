@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#030909">
+<title>NEON SNAKE — Protocolo Matrix</title>
+<style>
+:root{color-scheme:dark;--verde:#73ff86;--ciano:#43ecff;--magenta:#ff4cba;--texto:#dbffe7;--apagado:#7b9e92;--borda:#73ff862b}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;min-height:100svh;background:#030909;color:var(--texto);font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
+button{font:inherit}button:focus-visible{outline:2px solid var(--ciano);outline-offset:5px}
+#chuva{position:fixed;inset:0;width:100%;height:100%;opacity:.32;pointer-events:none}
+body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 35%,transparent,#030909 85%),repeating-linear-gradient(0deg,#0002 0px,#0002 1px,transparent 1px,transparent 4px)}
+.interface{position:relative;z-index:2;width:min(100% - 48px,1040px);margin:auto;padding:32px 0 24px}
+.barra-superior,.rodape{display:flex;justify-content:space-between;align-items:center;gap:16px;color:var(--apagado);font-size:10px;letter-spacing:2px;text-transform:uppercase}
+.conexao{display:flex;align-items:center;gap:9px}.conexao::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--verde);box-shadow:0 0 12px var(--verde)}
+header{text-align:center;padding:30px 0 22px}.etiqueta{color:var(--ciano);font-size:10px;letter-spacing:5px}
+h1{position:relative;display:inline-block;margin:12px 0 9px;font-size:clamp(38px,7vw,70px);font-weight:900;line-height:1;letter-spacing:-4px;color:var(--verde);text-shadow:0 0 28px #73ff8640}
+h1::before,h1::after{content:attr(data-texto);position:absolute;inset:0;opacity:0;pointer-events:none}h1::before{color:var(--ciano);animation:glitch 7s infinite}h1::after{color:var(--magenta);animation:glitch 7s infinite reverse}
+.subtitulo{margin:0;color:var(--apagado);font-size:11px;letter-spacing:3px}
+.painel{width:min(100%,650px);margin:auto;background:#061210eb;border:1px solid var(--borda);box-shadow:0 0 70px #73ff8607,0 28px 70px #0008}
+.placar{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--borda)}.medida{padding:16px 20px}.medida+.medida{border-left:1px solid var(--borda)}
+.rotulo{display:block;font-size:9px;letter-spacing:2px;color:var(--apagado)}.valor{display:block;margin-top:6px;font-size:26px;font-weight:bold}#pontos{color:var(--verde)}#recorde{color:var(--ciano)}#nivel{color:var(--magenta)}
+.cabecalho-jogo{display:flex;justify-content:space-between;padding:11px 16px;gap:8px;font-size:9px;letter-spacing:1.5px;color:var(--apagado)}#situacao{color:var(--verde)}
+.arena{position:relative;margin:0 14px;aspect-ratio:1;overflow:hidden;border:1px solid #43ecff35;background:#030b09;box-shadow:inset 0 0 35px #0009}.arena::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 60px #0007;border:1px solid #73ff860c}#jogo{display:block;width:100%;height:100%}
+.sobreposicao{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:24px;background:#020b09d9;backdrop-filter:blur(6px);z-index:3}
+.simbolo{width:62px;height:62px;display:grid;place-items:center;margin-bottom:22px;border:1px solid var(--verde);color:var(--verde);font-size:28px;box-shadow:0 0 24px #73ff8615,inset 0 0 20px #73ff8610}
+.sobreposicao h2{margin:0;font-size:clamp(22px,5vw,34px);letter-spacing:-1px;color:var(--verde)}.sobreposicao p{color:var(--apagado);font-size:12px;line-height:1.8;max-width:320px;margin:16px 0 23px}
+.botao-iniciar{cursor:pointer;padding:14px 23px;color:#031109;background:var(--verde);border:1px solid var(--verde);font-weight:bold;font-size:12px;letter-spacing:2px;box-shadow:0 0 22px #73ff8625;transition:box-shadow .2s,background .2s}.botao-iniciar:hover{background:#b1ffbc;box-shadow:0 0 32px #73ff8650}.atalho{margin-top:14px;font-size:9px;color:var(--apagado);letter-spacing:2px}
+.comandos{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px;font-size:10px;color:var(--apagado)}.teclas{display:flex;align-items:center;gap:5px;flex-wrap:wrap}kbd{color:var(--texto);border:1px solid #73ff8633;padding:4px 6px;font:inherit;background:#73ff8608}
+.botao-pausa{background:transparent;color:var(--ciano);border:1px solid #43ecff40;padding:8px 11px;cursor:pointer;font-size:10px;white-space:nowrap}.botao-pausa:disabled{opacity:.35;cursor:default}.rodape{margin-top:25px;font-size:9px}.destaque{color:var(--magenta)}.falha{animation:impacto .35s ease-out}
+@keyframes glitch{0%,93%,97%,100%{opacity:0;transform:none}94%{opacity:.8;transform:translate(3px,-1px);clip-path:inset(15% 0 65%)}95%{opacity:.8;transform:translate(-3px,1px);clip-path:inset(60% 0 18%)}96%{opacity:.5;transform:translate(2px,0);clip-path:inset(38% 0 44%)}}
+@keyframes impacto{0%,50%{border-color:var(--magenta);box-shadow:0 0 45px #ff4cba44}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@media(max-width:600px){.interface{width:calc(100% - 24px);padding-top:20px}header{padding:26px 0 20px}.barra-superior,.rodape{font-size:8px;letter-spacing:1px}h1{letter-spacing:-2px}.medida{padding:13px}.rotulo{font-size:8px;letter-spacing:1px}.valor{font-size:23px}.arena{margin:0 8px}.comandos{padding:12px 9px;gap:7px;font-size:9px}.subtitulo{font-size:9px;letter-spacing:2px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}#chuva{opacity:.15}}
+</style>
+</head>
+<body>
+<canvas id="chuva" aria-hidden="true"></canvas>
+<main class="interface">
+<div class="barra-superior"><span>Arcade / Setor 01</span><span class="conexao">Sistema conectado</span></div>
+<header><div class="etiqueta">Protocolo de sobrevivência</div><h1 data-texto="NEON SNAKE">NEON SNAKE</h1><p class="subtitulo">Consuma dados. Evite o colapso.</p></header>
+<section class="painel" aria-label="Jogo da cobrinha">
+<div class="placar">
+<div class="medida"><span class="rotulo">Pontuação</span><span class="valor" id="pontos">0000</span></div>
+<div class="medida"><span class="rotulo">Recorde</span><span class="valor" id="recorde">0000</span></div>
+<div class="medida"><span class="rotulo">Nível</span><span class="valor" id="nivel">01</span></div>
+</div>
+<div class="cabecalho-jogo"><span>Grade 28 × 28</span><span id="situacao" role="status">Aguardando conexão</span></div>
+<div class="arena" id="arena">
+<canvas id="jogo" aria-label="Área do jogo. Use as setas ou WASD para mover a cobra."></canvas>
+<div class="sobreposicao" id="sobreposicao">
+<div class="simbolo" id="simbolo" aria-hidden="true">⌁</div>
+<h2 id="titulo">ENTRE NA MATRIX</h2>
+<p id="mensagem">Capture os fragmentos magenta para crescer. Evite as paredes e o próprio corpo.</p>
+<button class="botao-iniciar" id="iniciar" type="button">INICIAR PROTOCOLO</button>
+<span class="atalho" id="atalho">Pressione Enter ou Espaço</span>
+</div></div>
+<div class="comandos"><div class="teclas"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd><span> / </span><kbd>W A S D</kbd></div><button class="botao-pausa" id="pausar" type="button" disabled>PAUSAR [P]</button></div>
+</section>
+<div class="rodape"><span><span class="destaque">◆</span> Fragmento = 10 pontos</span><span>O ritmo aumenta a cada captura</span></div>
+</main>
+<script>
+"use strict";
+(() => {
+  // Tudo funciona localmente, inclusive sem conexão com a internet.
+  const obter = id => document.getElementById(id);
+  const tela = obter("jogo"), contexto = tela.getContext("2d");
+  const chuva = obter("chuva"), contextoChuva = chuva.getContext("2d");
+  const movimentoReduzido = matchMedia("(prefers-reduced-motion: reduce)");
+  const TAMANHO = 28, CHAVE_RECORDE = "neon-snake-recorde-v1";
+  const direcoes = {
+    arrowup:{x:0,y:-1}, w:{x:0,y:-1}, arrowdown:{x:0,y:1}, s:{x:0,y:1},
+    arrowleft:{x:-1,y:0}, a:{x:-1,y:0}, arrowright:{x:1,y:0}, d:{x:1,y:0}
+  };
+  let cobra, direcao, fila, alimento, particulas;
+  let estado = "inicio", pontos = 0, recorde = 0, recordeInicial = 0;
+  let acumulado = 0, ultimoTempo = 0, largura = 0, gotas = [];
+  let larguraChuva = 0, alturaChuva = 0, ultimoTempoChuva = 0;
+
+  // Armazenamento bloqueado não interrompe a partida.
+  try {
+    const valor = Number(localStorage.getItem(CHAVE_RECORDE));
+    if (Number.isSafeInteger(valor) && valor >= 0) recorde = valor;
+  } catch (_) {}
+
+  function salvarRecorde() {
+    if (pontos <= recorde) return;
+    recorde = pontos;
+    try { localStorage.setItem(CHAVE_RECORDE, String(recorde)); } catch (_) {}
+  }
+  function atualizarPlacar() {
+    obter("pontos").textContent = String(pontos).padStart(4,"0");
+    obter("recorde").textContent = String(recorde).padStart(4,"0");
+    obter("nivel").textContent = String(1 + Math.floor(pontos / 50)).padStart(2,"0");
+  }
+  function prepararGrade() {
+    cobra = [{x:8,y:14},{x:7,y:14},{x:6,y:14},{x:5,y:14}];
+    direcao = {x:1,y:0}; fila = []; particulas = []; alimento = {x:20,y:14};
+  }
+  function sortearAlimento() {
+    // Escolher células livres evita tentativas infinitas numa grade cheia.
+    const ocupadas = new Set(cobra.map(parte => parte.y * TAMANHO + parte.x));
+    const livres = [];
+    for (let y = 0; y < TAMANHO; y++) for (let x = 0; x < TAMANHO; x++) {
+      if (!ocupadas.has(y * TAMANHO + x)) livres.push({x,y});
+    }
+    return livres.length ? livres[Math.floor(Math.random() * livres.length)] : null;
+  }
+  function iniciar() {
+    prepararGrade(); pontos = 0; recordeInicial = recorde; acumulado = 0;
+    ultimoTempo = performance.now(); estado = "jogando"; alimento = sortearAlimento();
+    obter("sobreposicao").hidden = true; obter("arena").classList.remove("falha");
+    obter("pausar").disabled = false; obter("pausar").textContent = "PAUSAR [P]";
+    obter("situacao").textContent = "Protocolo ativo"; atualizarPlacar();
+  }
+  function exibirSobreposicao(titulo,mensagem,botao,simbolo,atalho) {
+    obter("titulo").textContent = titulo; obter("mensagem").textContent = mensagem;
+    obter("iniciar").textContent = botao; obter("simbolo").textContent = simbolo;
+    obter("atalho").textContent = atalho; obter("sobreposicao").hidden = false;
+  }
+  function alternarPausa() {
+    if (estado !== "jogando" && estado !== "pausado") return;
+    if (estado === "jogando") {
+      estado = "pausado"; obter("situacao").textContent = "Conexão suspensa";
+      obter("pausar").textContent = "RETOMAR [P]";
+      exibirSobreposicao("SISTEMA EM PAUSA","Respire. Seus dados estão seguros. Retome quando estiver pronto.","RETOMAR PROTOCOLO","Ⅱ","P, Enter ou Espaço para retomar");
+    } else {
+      estado = "jogando"; acumulado = 0; ultimoTempo = performance.now();
+      obter("sobreposicao").hidden = true; obter("situacao").textContent = "Protocolo ativo";
+      obter("pausar").textContent = "PAUSAR [P]";
+    }
+  }
+  function encerrar(vitoria = false) {
+    estado = "fim"; salvarRecorde(); atualizarPlacar(); obter("pausar").disabled = true;
+    obter("situacao").textContent = vitoria ? "Grade conquistada" : "Conexão perdida";
+    if (!vitoria) obter("arena").classList.add("falha");
+    const novoRecorde = pontos > recordeInicial ? " Novo recorde registrado." : "";
+    exibirSobreposicao(vitoria ? "MATRIX DOMINADA" : "CONEXÃO ENCERRADA",
+      `${vitoria ? "Você ocupou toda a grade." : "O protocolo entrou em colapso."} Pontuação: ${pontos}.${novoRecorde}`,
+      "REINICIAR PROTOCOLO",vitoria ? "✓" : "×","Enter ou Espaço para tentar novamente");
+  }
+  function emitirParticulas(posicao) {
+    if (movimentoReduzido.matches) return;
+    for (let i = 0; i < 14; i++) {
+      const angulo = Math.random() * Math.PI * 2, velocidade = 2 + Math.random() * 3;
+      particulas.push({x:posicao.x+.5,y:posicao.y+.5,vx:Math.cos(angulo)*velocidade,
+        vy:Math.sin(angulo)*velocidade,vida:.45+Math.random()*.2});
+    }
+  }
+  function passo() {
+    if (fila.length) direcao = fila.shift();
+    const cabeca = {x:cobra[0].x+direcao.x,y:cobra[0].y+direcao.y};
+    const comeu = alimento && cabeca.x === alimento.x && cabeca.y === alimento.y;
+    // Sem crescimento, a cauda sai no mesmo passo e sua célula fica disponível.
+    const corpo = comeu ? cobra : cobra.slice(0,-1);
+    if (cabeca.x < 0 || cabeca.y < 0 || cabeca.x >= TAMANHO || cabeca.y >= TAMANHO ||
+      corpo.some(parte => parte.x === cabeca.x && parte.y === cabeca.y)) { encerrar(); return; }
+    cobra.unshift(cabeca);
+    if (comeu) {
+      emitirParticulas(alimento); pontos += 10; salvarRecorde(); atualizarPlacar();
+      alimento = sortearAlimento(); if (!alimento) encerrar(true);
+    } else cobra.pop();
+  }
+  function solicitarDirecao(nova) {
+    if (estado !== "jogando" || fila.length >= 2) return;
+    const anterior = fila.length ? fila[fila.length-1] : direcao;
+    // A fila preserva curvas rápidas e impede inversões de 180 graus.
+    if (nova.x === anterior.x && nova.y === anterior.y) return;
+    if (nova.x === -anterior.x && nova.y === -anterior.y) return;
+    fila.push(nova);
+  }
+  function desenhar(tempo) {
+    if (!largura) return;
+    const celula = largura / TAMANHO;
+    contexto.clearRect(0,0,largura,largura); contexto.fillStyle = "#030b09";
+    contexto.fillRect(0,0,largura,largura); contexto.lineWidth = 1;
+    contexto.strokeStyle = "#73ff860b"; contexto.beginPath();
+    for (let i = 1; i < TAMANHO; i++) {
+      const posicao = i * celula;
+      contexto.moveTo(posicao,0); contexto.lineTo(posicao,largura);
+      contexto.moveTo(0,posicao); contexto.lineTo(largura,posicao);
+    }
+    contexto.stroke();
+    // Fragmento de dados: losango pulsante e mira de localização.
+    if (alimento) {
+      const x = (alimento.x+.5)*celula, y = (alimento.y+.5)*celula;
+      const pulso = movimentoReduzido.matches ? 1 : 1 + Math.sin(tempo/180)*.14;
+      contexto.save(); contexto.translate(x,y); contexto.strokeStyle = "#ff4cba55";
+      contexto.strokeRect(-celula*.65,-celula*.65,celula*1.3,celula*1.3);
+      contexto.rotate(Math.PI/4); contexto.shadowColor = "#ff4cba";
+      contexto.shadowBlur = 18; contexto.fillStyle = "#ff4cba";
+      const lado = celula * .48 * pulso;
+      contexto.fillRect(-lado/2,-lado/2,lado,lado); contexto.fillStyle = "#ffe2f4";
+      contexto.fillRect(-lado/5,-lado/5,lado*.4,lado*.4); contexto.restore();
+    }
+    // As células conectadas formam um corpo contínuo, legível em alta velocidade.
+    contexto.save(); contexto.lineCap = "round"; contexto.lineJoin = "round";
+    contexto.lineWidth = celula*.72; contexto.strokeStyle = "#73ff86";
+    contexto.shadowColor = "#73ff86"; contexto.shadowBlur = 14; contexto.beginPath();
+    cobra.forEach((parte,indice) => {
+      const x = (parte.x+.5)*celula, y = (parte.y+.5)*celula;
+      if (!indice) contexto.moveTo(x,y); else contexto.lineTo(x,y);
+    });
+    contexto.stroke(); contexto.shadowBlur = 0;
+    cobra.forEach((parte,indice) => {
+      contexto.fillStyle = indice === 0 ? "#c3ffd0" : "#092f1b66";
+      const tamanho = indice === 0 ? .72 : .22;
+      contexto.fillRect((parte.x+(1-tamanho)/2)*celula,(parte.y+(1-tamanho)/2)*celula,celula*tamanho,celula*tamanho);
+    });
+    const cabeca = cobra[0], centroX = (cabeca.x+.5)*celula, centroY = (cabeca.y+.5)*celula;
+    contexto.fillStyle = "#052317";
+    for (const lado of [-1,1]) {
+      const x = centroX+direcao.x*celula*.2-direcao.y*lado*celula*.18;
+      const y = centroY+direcao.y*celula*.2+direcao.x*lado*celula*.18;
+      contexto.fillRect(x-celula*.065,y-celula*.065,celula*.13,celula*.13);
+    }
+    contexto.restore();
+    for (const particula of particulas) {
+      contexto.globalAlpha = Math.max(0,particula.vida/.65); contexto.fillStyle = "#ff83d0";
+      contexto.fillRect(particula.x*celula,particula.y*celula,3,3);
+    }
+    contexto.globalAlpha = 1;
+  }
+  function redimensionar() {
+    // Alta resolução sem mudar a grade ou a partida em andamento.
+    const escala = Math.min(window.devicePixelRatio || 1,2);
+    largura = tela.getBoundingClientRect().width;
+    tela.width = Math.round(largura*escala); tela.height = Math.round(largura*escala);
+    contexto.setTransform(escala,0,0,escala,0,0);
+    larguraChuva = window.innerWidth; alturaChuva = window.innerHeight;
+    chuva.width = Math.round(larguraChuva*escala); chuva.height = Math.round(alturaChuva*escala);
+    contextoChuva.setTransform(escala,0,0,escala,0,0);
+    gotas = Array.from({length:Math.ceil(larguraChuva/20)},() => ({y:Math.random()*alturaChuva,velocidade:12+Math.random()*12}));
+    desenharChuva();
+  }
+  function desenharChuva() {
+    contextoChuva.fillStyle = "rgba(3,9,9,.12)"; contextoChuva.fillRect(0,0,larguraChuva,alturaChuva);
+    contextoChuva.font = "14px monospace";
+    const caracteres = "01アイウエオカキクケコサシスセソ<>/{}";
+    gotas.forEach((gota,indice) => {
+      contextoChuva.fillStyle = Math.random() > .97 ? "#b6ffd0" : "#2c9d56";
+      contextoChuva.fillText(caracteres[Math.floor(Math.random()*caracteres.length)],indice*20,gota.y);
+      gota.y += gota.velocidade;
+      if (gota.y > alturaChuva+30 && Math.random() > .97) gota.y = -20;
+    });
+  }
+  function animar(tempo) {
+    const intervaloQuadro = Math.min(Math.max((tempo-ultimoTempo)/1000,0),.1);
+    ultimoTempo = tempo;
+    if (estado === "jogando") {
+      acumulado += intervaloQuadro*1000;
+      // Cada captura acelera a cobra; o limite mantém o jogo controlável.
+      const intervaloPasso = Math.max(58,155-pontos/10*3);
+      while (acumulado >= intervaloPasso && estado === "jogando") { acumulado -= intervaloPasso; passo(); }
+      for (const particula of particulas) {
+        particula.x += particula.vx*intervaloQuadro; particula.y += particula.vy*intervaloQuadro;
+        particula.vida -= intervaloQuadro;
+      }
+      particulas = particulas.filter(particula => particula.vida > 0);
+    }
+    desenhar(tempo);
+    if (!movimentoReduzido.matches && !document.hidden && tempo-ultimoTempoChuva > 65) {
+      desenharChuva(); ultimoTempoChuva = tempo;
+    }
+    requestAnimationFrame(animar);
+  }
+  document.addEventListener("keydown",evento => {
+    if (evento.ctrlKey || evento.metaKey || evento.altKey) return;
+    const tecla = evento.key.toLowerCase();
+    if (direcoes[tecla]) { evento.preventDefault(); if (!evento.repeat) solicitarDirecao(direcoes[tecla]); return; }
+    if (tecla === "p" || tecla === "escape") { evento.preventDefault(); if (!evento.repeat) alternarPausa(); return; }
+    if (tecla === "enter" || tecla === " ") {
+      // Botões focados usam a ativação nativa para evitar disparos duplicados.
+      if (evento.target instanceof HTMLButtonElement) return;
+      evento.preventDefault(); if (evento.repeat) return;
+      if (estado === "inicio" || estado === "fim") iniciar(); else alternarPausa();
+    }
+  });
+  obter("iniciar").addEventListener("click",() => {
+    if (estado === "pausado") alternarPausa(); else iniciar(); obter("iniciar").blur();
+  });
+  obter("pausar").addEventListener("click",() => { alternarPausa(); obter("pausar").blur(); });
+  // Pausa automática ao trocar de janela ou de aba.
+  window.addEventListener("blur",() => { if (estado === "jogando") alternarPausa(); });
+  document.addEventListener("visibilitychange",() => { if (document.hidden && estado === "jogando") alternarPausa(); });
+  new ResizeObserver(redimensionar).observe(obter("arena")); window.addEventListener("resize",redimensionar);
+  prepararGrade(); atualizarPlacar(); redimensionar(); requestAnimationFrame(animar);
+})();
+</script>
+</body>
+</html>
