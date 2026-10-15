@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEURAL SNAKE // CYBERPUNK EDITION</title>
+<style>
+  /* ============================================
+     NEURAL SNAKE - CYBERPUNK EDITION
+     Global Reset & Base Styles
+     ============================================ */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #020202;
+    color: #0f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    touch-action: none;
+  }
+
+  /* ============================================
+     MATRIX RAIN BACKGROUND
+     Falling digital code effect behind the game
+     ============================================ */
+  #matrix-rain {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    opacity: 0.5;
+  }
+
+  /* ============================================
+     SCANLINES OVERLAY
+     CRT-style horizontal scanlines
+     ============================================ */
+  .scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0) 50%,
+      rgba(0, 0, 0, 0.15) 50%,
+      rgba(0, 0, 0, 0.15)
+    );
+    background-size: 100% 4px;
+  }
+
+  /* ============================================
+     VIGNETTE
+     Subtle darkening at edges for focus
+     ============================================ */
+  .vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(
+      circle,
+      transparent 25%,
+      #020202 85%
+    );
+  }
+
+  /* ============================================
+     GAME CONTAINER
+     Centers the game canvas and UI
+     ============================================ */
+  .game-container {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #gameCanvas {
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #0f0;
+    box-shadow:
+      0 0 30px rgba(0, 255, 0, 0.2),
+      inset 0 0 40px rgba(0, 255, 0, 0.05);
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ============================================
+     HUD - HEADS-UP DISPLAY
+     Score and high score at top of screen
+     ============================================ */
+  .hud {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 48px;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .hud-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .hud-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #0ff;
+    margin-bottom: 6px;
+    text-shadow: 0 0 5px #0ff;
+  }
+
+  .hud-value {
+    font-size: 26px;
+    font-weight: bold;
+    color: #0f0;
+    text-shadow: 0 0 12px #0f0;
+    text-align: right;
+  }
+
+  /* ============================================
+     OVERLAY SCREENS
+     Start and Game Over screens
+     ============================================ */
+  .overlay-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(2, 2, 2, 0.94);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border: 2px solid #0f0;
+    box-shadow: 0 0 40px rgba(0, 255, 0, 0.15);
+  }
+
+  .overlay-screen.hidden {
+    display: none;
+  }
+
+  /* ============================================
+     TYPOGRAPHY
+     Futuristic terminal styling
+     ============================================ */
+  .title {
+    font-size: 44px;
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    margin-bottom: 18px;
+    text-align: center;
+    color: #0f0;
+    text-shadow: 0 0 20px #0f0;
+  }
+
+  .subtitle {
+    font-size: 17px;
+    color: #0ff;
+    margin-bottom: 28px;
+    text-align: center;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #0ff;
+  }
+
+  /* ============================================
+     GLITCH EFFECT
+     Cyberpunk text distortion
+     ============================================ */
+  .glitch {
+    position: relative;
+    display: inline-block;
+  }
+
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #020202;
+    overflow: hidden;
+  }
+
+  .glitch::before {
+    left: 2px;
+    text-shadow: -1px 0 2px #f0f;
+    clip: rect(30px, 9999px, 70px, 0);
+    animation: glitch-anim 2s infinite linear alternate-reverse;
+  }
+
+  .glitch::after {
+    left: -2px;
+    text-shadow: -1px 0 2px #0ff;
+    clip: rect(35px, 9999px, 65px, 0);
+    animation: glitch-anim 3s infinite linear alternate-reverse;
+  }
+
+  @keyframes glitch-anim {
+    0%  { clip: rect(15px, 9999px, 25px, 0); }
+    25% { clip: rect(45px, 9999px, 55px, 0); }
+    50% { clip: rect(10px, 9999px, 30px, 0); }
+    75% { clip: rect(60px, 9999px, 80px, 0); }
+    100%{ clip: rect(35px, 9999px, 50px, 0); }
+  }
+
+  /* ============================================
+     BUTTONS
+     Cyber interface buttons
+     ============================================ */
+  .btn {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    padding: 16px 36px;
+    background: transparent;
+    color: #0f0;
+    border: 2px solid #0f0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-shadow: 0 0 10px #0f0;
+    margin-top: 10px;
+  }
+
+  .btn:hover {
+    background: #0f0;
+    color: #000;
+    box-shadow: 0 0 25px #0f0;
+    transform: scale(1.05);
+  }
+
+  .btn:active {
+    transform: scale(0.96);
+  }
+
+  .btn:focus {
+    outline: none;
+  }
+
+  /* ============================================
+     SCORE PANELS
+     ============================================ */
+  .score-panel {
+    display: flex;
+    gap: 50px;
+    margin-bottom: 22px;
+  }
+
+  .final-score {
+    font-size: 34px;
+    color: #0ff;
+    margin-bottom: 8px;
+    text-align: center;
+    text-shadow: 0 0 12px #0ff;
+  }
+
+  .final-score div:nth-child(1) {
+    font-size: 16px;
+    color: #0f0;
+    margin-bottom: 4px;
+    text-shadow: 0 0 6px #0f0;
+  }
+
+  .final-highscore {
+    font-size: 26px;
+    color: #f0f;
+    margin-bottom: 30px;
+    text-align: center;
+    text-shadow: 0 0 12px #f0f;
+  }
+
+  .final-highscore div:nth-child(1) {
+    font-size: 14px;
+    color: #0ff;
+    margin-bottom: 4px;
+    text-shadow: 0 0 6px #0ff;
+  }
+
+  /* ============================================
+     CONTROLS HINT
+     ============================================ */
+  .controls-hint {
+    font-size: 15px;
+    color: #0ff;
+    margin-bottom: 26px;
+    text-align: center;
+    letter-spacing: 2px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .controls-hint span {
+    border: 1px solid #0ff;
+    padding: 6px 12px;
+    background: rgba(0, 255, 255, 0.08);
+    color: #0ff;
+    text-shadow: 0 0 4px #0ff;
+  }
+
+  /* ============================================
+     RESPONSIVE
+     ============================================ */
+  @media (max-width: 768px) {
+    .title { font-size: 32px; }
+    .hud { padding: 12px 24px; }
+    .hud-value { font-size: 20px; }
+    .hud-label { font-size: 10px; }
+    .btn { font-size: 16px; padding: 14px 28px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============================================
+       MATRIX RAIN CANVAS
+       Falling green/cyan/magenta code background
+       ============================================ -->
+  <canvas id="matrix-rain"></canvas>
+
+  <!-- ============================================
+       SCANLINES OVERLAY
+       ============================================ -->
+  <div class="scanlines"></div>
+
+  <!-- ============================================
+       VIGNETTE
+       ============================================ -->
+  <div class="vignette"></div>
+
+  <!-- ============================================
+       GAME CONTAINER
+       ============================================ -->
+  <div class="game-container">
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+    <!-- HUD - Score Display -->
+    <div class="hud">
+      <div class="hud-item">
+        <div class="hud-label">CORE INTEGRITY</div>
+        <div class="hud-value" id="score">0</div>
+      </div>
+      <div class="hud-item">
+        <div class="hud-label">NEURAL MAX</div>
+        <div class="hud-value" id="highscore">0</div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         START SCREEN
+         ============================================ -->
+    <div id="startScreen" class="overlay-screen">
+      <h1 class="title glitch" data-text="NEURAL SNAKE">NEURAL SNAKE</h1>
+      <p class="subtitle">INITIALIZE NEURAL LINK // SYSTEM READY // AWAITING INPUT</p>
+      <div class="controls-hint">
+        <span>ARROWS</span> <span>WASD</span>
+      </div>
+      <button class="btn" onclick="startGame()">INITIALIZE SYSTEM</button>
+    </div>
+
+    <!-- ============================================
+         GAME OVER SCREEN
+         ============================================ -->
+    <div id="gameOverScreen" class="overlay-screen hidden">
+      <h1 class="title glitch" data-text="SYSTEM CRITICAL">SYSTEM CRITICAL</h1>
+      <p class="subtitle">NEURAL LINK LOST // CORE BREACH // TERMINATED</p>
+      <div class="score-panel">
+        <div class="final-score">
+          <div>CORE INTEGRITY</div>
+          <div id="finalScore">0</div>
+        </div>
+        <div class="final-highscore">
+          <div>NEURAL MAX</div>
+          <div id="finalHighScore">0</div>
+        </div>
+      </div>
+      <button class="btn" onclick="resetGame()">REBOOT SYSTEM</button>
+    </div>
+
+  </div>
+
+  <!-- ============================================
+       JAVASCRIPT - GAME LOGIC
+       ============================================ -->
+  <script>
+    // ============================================
+    // NEURAL SNAKE - CYBERPUNK EDITION
+    // A complete, self-contained Snake game
+    // featuring Matrix aesthetics, cyber interface,
+    // localStorage high scores, and dynamic difficulty.
+    // ============================================
+
+    // -------------------------------------------------------------------------
+    // CONFIGURATION
+    // -------------------------------------------------------------------------
+    const GRID_SIZE      = 20;   // pixels per grid cell
+    const CANVAS_SIZE    = 600;  // canvas width/height in pixels
+    const BASE_SPEED     = 150;  // ms per frame (lower = faster)
+    const MIN_SPEED      = 45;   // absolute speed cap (fastest)
+    const SPEED_INCR     = 2;    // ms reduction per snake segment
+    const EAT_BONUS      = 6;    // extra speed boost when eating food
+
+    // -------------------------------------------------------------------------
+    // DOM REFERENCES
+    // -------------------------------------------------------------------------
+    const canvas        = document.getElementById('gameCanvas');
+    const ctx           = canvas.getContext('2d');
+    const scoreEl       = document.getElementById('score');
+    const highScoreEl   = document.getElementById('highscore');
+    const finalScoreEl  = document.getElementById('finalScore');
+    const finalHighEl   = document.getElementById('finalHighScore');
+    const startScreen   = document.getElementById('startScreen');
+    const gameOverScreen= document.getElementById('gameOverScreen');
+
+    // -------------------------------------------------------------------------
+    // GAME STATE
+    // -------------------------------------------------------------------------
+    let snake         = [];   // array of {x, y} grid coordinates
+    let food          = {x: 0, y: 0};
+    let score         = 0;
+    let highScore     = 0;
+    let gameActive    = false;
+    let gameLoopId    = null;
+    let currentSpeed  = BASE_SPEED;
+    let direction     = 'RIGHT';
+    let nextDirection = null;
+    let time          = 0;    // for food pulsing animation
+
+    // -------------------------------------------------------------------------
+    // BOOT SEQUENCE
+    // -------------------------------------------------------------------------
+    function init() {
+      // Load persisted high score from localStorage
+      highScore = parseInt(localStorage.getItem('neuralSnakeHighScore')) || 0;
+      highScoreEl.textContent = highScore;
+
+      // Start the Matrix digital rain background effect
+      initMatrixRain();
+
+      // Display the start screen
+      startScreen.classList.remove('hidden');
+      gameOverScreen.classList.add('hidden');
+    }
+
+    // -------------------------------------------------------------------------
+    // MATRIX RAIN EFFECT
+    // Falling digital code behind the game
+    // -------------------------------------------------------------------------
+    function initMatrixRain() {
+      const rainCanvas = document.getElementById('matrix-rain');
+      const rainCtx    = rainCanvas.getContext('2d');
+
+      // Character set: alphanumeric + cyber symbols
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*+=_-<>[]{}';
+      const fontSize = 12;
+
+      function resize() {
+        rainCanvas.width = window.innerWidth;
+        rainCanvas.height = window.innerHeight;
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+
+      // One drop per column
+      const columns = rainCanvas.width / fontSize;
+      const drops = Array(columns).fill(1);
+
+      function draw() {
+        // Semi-transparent clear for trail effect
+        rainCtx.fillStyle = 'rgba(2, 2, 2, 0.06)';
+        rainCtx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+
+        rainCtx.font = fontSize + 'px monospace';
+
+        for (let i = 0; i < drops.length; i++) {
+          // Color distribution: mostly green, some cyan, rare magenta
+          const rand = Math.random();
+          if (rand > 0.97) {
+            rainCtx.fillStyle = '#0f0';   // green
+          } else if (rand > 0.93) {
+            rainCtx.fillStyle = '#0ff';   // cyan
+          } else if (rand > 0.90) {
+            rainCtx.fillStyle = '#f0f';   // magenta
+          } else {
+            rainCtx.fillStyle = '#0f0';
+          }
+
+          const text = chars[Math.floor(Math.random() * chars.length)];
+          rainCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+          // Occasionally reset a drop to the top
+          if (drops[i] * fontSize > rainCanvas.height || Math.random() > 0.985) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+    // -------------------------------------------------------------------------
+    // GAME LOGIC
+    // -------------------------------------------------------------------------
+
+    function resetGame() {
+      // Initial snake: 3 segments horizontal, center of grid
+      const startX = Math.floor(CANVAS_SIZE / GRID_SIZE / 2);
+      const startY = Math.floor(CANVAS_SIZE / GRID_SIZE / 2);
+      snake = [
+        {x: startX,     y: startY},
+        {x: startX - 1, y: startY},
+        {x: startX - 2, y: startY}
+      ];
+
+      score = 0;
+      direction = 'RIGHT';
+      nextDirection = null;
+      currentSpeed = BASE_SPEED;
+
+      placeFood();
+      updateScore();
+
+      gameActive = true;
+      gameOverScreen.classList.add('hidden');
+
+      draw();
+      gameLoop();
+    }
+
+    function startGame() {
+      startScreen.classList.add('hidden');
+      resetGame();
+    }
+
+    // Spawn food at a random empty grid cell
+    function placeFood() {
+      let valid = false;
+      while (!valid) {
+        food = {
+          x: Math.floor(Math.random() * (CANVAS_SIZE / GRID_SIZE)),
+          y: Math.floor(Math.random() * (CANVAS_SIZE / GRID_SIZE))
+        };
+        valid = true;
+        for (let segment of snake) {
+          if (segment.x === food.x && segment.y === food.y) {
+            valid = false;
+            break;
+          }
+        }
+      }
+    }
+
+    // Update score displays and persist high score
+    function updateScore() {
+      scoreEl.textContent = score;
+      if (score > highScore) {
+        highScore = score;
+        highScoreEl.textContent = highScore;
+        localStorage.setItem('neuralSnakeHighScore', highScore);
+      }
+    }
+
+    // Render a single frame
+    function draw() {
+      time += 0.12; // animation timer
+
+      // Clear canvas
+      ctx.fillStyle = '#020202';
+      ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      // Draw subtle grid lines
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.04)';
+      ctx.lineWidth = 1;
+      const gridCount = CANVAS_SIZE / GRID_SIZE;
+      for (let i = 0; i <= gridCount; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * GRID_SIZE, 0);
+        ctx.lineTo(i * GRID_SIZE, CANVAS_SIZE);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * GRID_SIZE);
+        ctx.lineTo(CANVAS_SIZE, i * GRID_SIZE);
+        ctx.stroke();
+      }
+
+      // --- Draw Food ---
+      // Pulsing effect using sine wave
+      const pulse = 1 + Math.sin(time) * 0.18;
+      const radius = (GRID_SIZE / 3) * pulse;
+
+      ctx.fillStyle = '#f0f'; // magenta
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = '#f0f';
+      ctx.beginPath();
+      ctx.arc(
+        food.x * GRID_SIZE + GRID_SIZE / 2,
+        food.y * GRID_SIZE + GRID_SIZE / 2,
+        radius,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // --- Draw Snake ---
+      snake.forEach((segment, index) => {
+        if (index === 0) {
+          // HEAD: bright cyan with strong glow
+          ctx.fillStyle = '#0ff';
+          ctx.shadowBlur = 22;
+          ctx.shadowColor = '#0ff';
+        } else {
+          // BODY: green gradient from head to tail
+          const progress = index / snake.length;
+          ctx.fillStyle = progress > 0.75 ? '#060' :
+                          progress > 0.45 ? '#0a0' : '#0f0';
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#0f0';
+        }
+        // Draw segment with 1px gap for grid definition
+        ctx.fillRect(
+          segment.x * GRID_SIZE + 1,
+          segment.y * GRID_SIZE + 1,
+          GRID_SIZE - 2,
+          GRID_SIZE - 2
+        );
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    // Update game state: movement, collisions, food
+    function update() {
+      if (!gameActive) return;
+
+      // Apply pending direction change (prevent 180-degree reversals)
+      if (nextDirection) {
+        const cur = direction;
+        const nxt = nextDirection;
+        const isReversal =
+          (cur === 'UP'    && nxt === 'DOWN') ||
+          (cur === 'DOWN'  && nxt === 'UP')   ||
+          (cur === 'LEFT'  && nxt === 'RIGHT')||
+          (cur === 'RIGHT' && nxt === 'LEFT');
+
+        if (isReversal) {
+          nextDirection = null; // ignore invalid input
+        } else {
+          direction = nextDirection;
+          nextDirection = null;
+        }
+      }
+
+      // Calculate new head position
+      const head = {x: snake[0].x, y: snake[0].y};
+      switch (direction) {
+        case 'UP':    head.y--; break;
+        case 'DOWN':  head.y++; break;
+        case 'LEFT':  head.x--; break;
+        case 'RIGHT': head.x++; break;
+      }
+
+      const maxGrid = CANVAS_SIZE / GRID_SIZE;
+
+      // Wall collision
+      if (head.x < 0 || head.x >= maxGrid || head.y < 0 || head.y >= maxGrid) {
+        gameOver();
+        return;
+      }
+
+      // Self collision
+      for (let segment of snake) {
+        if (head.x === segment.x && head.y === segment.y) {
+          gameOver();
+          return;
+        }
+      }
+
+      // Move: insert new head
+      snake.unshift(head);
+
+      // Check food consumption
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        updateScore();
+        placeFood();
+
+        // Increasing difficulty: snake speeds up as it grows
+        currentSpeed = Math.max(MIN_SPEED,
+          BASE_SPEED - (snake.length * SPEED_INCR));
+        // Extra boost for eating
+        currentSpeed = Math.max(MIN_SPEED, currentSpeed - EAT_BONUS);
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    // Main game loop
+    function gameLoop() {
+      update();
+      if (gameActive) {
+        gameLoopId = setTimeout(gameLoop, currentSpeed);
+      }
+    }
+
+    // Game over sequence
+    function gameOver() {
+      gameActive = false;
+      if (gameLoopId) clearTimeout(gameLoopId);
+
+      // Persist high score if beaten
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neuralSnakeHighScore', highScore);
+      }
+
+      finalScoreEl.textContent = score;
+      finalHighEl.textContent = highScore;
+
+      gameOverScreen.classList.remove('hidden');
+    }
+
+    // -------------------------------------------------------------------------
+    // INPUT HANDLING
+    // -------------------------------------------------------------------------
+    document.addEventListener('keydown', (e) => {
+      // --- Menu navigation ---
+      if (!gameActive) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (!startScreen.classList.contains('hidden')) {
+            startGame();
+          } else if (!gameOverScreen.classList.contains('hidden')) {
+            resetGame();
+          }
+          return;
+        }
+      }
+
+      // --- Gameplay controls (Arrow keys + WASD) ---
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          if (direction !== 'DOWN') nextDirection = 'UP';
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          if (direction !== 'UP') nextDirection = 'DOWN';
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          if (direction !== 'RIGHT') nextDirection = 'LEFT';
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          if (direction !== 'LEFT') nextDirection = 'RIGHT';
+          break;
+      }
+
+      // Prevent page scroll with arrow keys
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // BOOT
+    // -------------------------------------------------------------------------
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNAKE // CYBERPROTOCOL</title>
+  <style>
+    /* ============================================
+       BASE & RESET
+       ============================================ */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --neon-green: #00ff41;
+      --neon-cyan: #00f0ff;
+      --neon-magenta: #ff00ff;
+      --dark-bg: #0a0a0a;
+      --panel-bg: rgba(10, 10, 10, 0.92);
+      --grid-line: rgba(0, 255, 65, 0.04);
+      --font-mono: 'Courier New', 'Lucida Console', monospace;
+      --glow-green: 0 0 8px #00ff41, 0 0 20px rgba(0, 255, 65, 0.4);
+      --glow-cyan: 0 0 8px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.4);
+      --glow-magenta: 0 0 8px #ff00ff, 0 0 20px rgba(255, 0, 255, 0.4);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--dark-bg);
+      font-family: var(--font-mono);
+      color: var(--neon-green);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* ============================================
+       MATRIX RAIN CANVAS (background layer)
+       ============================================ */
+    #matrix-rain {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.18;
+      pointer-events: none;
+    }
+
+    /* ============================================
+       SCANLINE OVERLAY
+       ============================================ */
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15) 0px,
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    }
+
+    /* ============================================
+       MAIN GAME CONTAINER
+       ============================================ */
+    .game-wrapper {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* ============================================
+       HEADER / TITLE
+       ============================================ */
+    .header {
+      text-align: center;
+      padding: 8px 20px;
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
+      background: var(--panel-bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+      animation: header-sweep 3s linear infinite;
+    }
+
+    @keyframes header-sweep {
+      0% { left: -100%; }
+      100% { left: 200%; }
+    }
+
+    .header h1 {
+      font-size: 28px;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      text-shadow: var(--glow-green);
+      animation: glitch-text 4s infinite;
+    }
+
+    .header .subtitle {
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: var(--neon-cyan);
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
+    @keyframes glitch-text {
+      0%, 92%, 100% { transform: translate(0); }
+      93% { transform: translate(-2px, 1px); }
+      94% { transform: translate(2px, -1px); }
+      95% { transform: translate(-1px, -1px); }
+      96% { transform: translate(1px, 2px); }
+      97% { transform: translate(-2px, 2px); }
+    }
+
+    /* ============================================
+       HUD (Heads-Up Display)
+       ============================================ */
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 8px;
+      font-size: 14px;
+    }
+
+    .hud-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-label {
+      color: var(--neon-cyan);
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .hud-value {
+      font-size: 20px;
+      text-shadow: var(--glow-green);
+      min-width: 60px;
+      text-align: right;
+    }
+
+    .hud-value.high-score {
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+    }
+
+    /* ============================================
+       GAME CANVAS
+       ============================================ */
+    .canvas-frame {
+      position: relative;
+      padding: 10px;
+      border: 1px solid var(--neon-green);
+      border-radius: 2px;
+      background: rgba(5, 5, 5, 0.85);
+      box-shadow: var(--glow-green), inset 0 0 30px rgba(0, 255, 65, 0.05);
+    }
+
+    .canvas-frame::before,
+    .canvas-frame::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: var(--neon-magenta);
+      border-style: solid;
+    }
+
+    .canvas-frame::before {
+      top: -1px;
+      left: -1px;
+      border-width: 2px 0 0 2px;
+    }
+
+    .canvas-frame::after {
+      bottom: -1px;
+      right: -1px;
+      border-width: 0 2px 2px 0;
+    }
+
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+      border: none;
+      background: transparent;
+    }
+
+    /* ============================================
+       CONTROLS INFO
+       ============================================ */
+    .controls-info {
+      display: flex;
+      gap: 24px;
+      font-size: 11px;
+      color: rgba(0, 240, 255, 0.6);
+      letter-spacing: 2px;
+    }
+
+    .key-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .key {
+      display: inline-block;
+      padding: 2px 6px;
+      border: 1px solid var(--neon-cyan);
+      border-radius: 2px;
+      font-size: 10px;
+      color: var(--neon-cyan);
+      background: rgba(0, 240, 255, 0.05);
+    }
+
+    /* ============================================
+       GAME OVER / OVERLAY SCREEN
+       ============================================ */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+
+    .overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .overlay-content {
+      text-align: center;
+      padding: 40px 60px;
+      border: 1px solid var(--neon-magenta);
+      background: var(--panel-bg);
+      box-shadow: var(--glow-magenta), inset 0 0 40px rgba(255, 0, 255, 0.05);
+      position: relative;
+    }
+
+    .overlay-content::before {
+      content: 'SYSTEM // TERMINATED';
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: var(--neon-magenta);
+      background: var(--dark-bg);
+      padding: 0 12px;
+    }
+
+    .overlay h2 {
+      font-size: 36px;
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+      letter-spacing: 6px;
+      margin-bottom: 16px;
+      animation: glitch-text 2s infinite;
+    }
+
+    .overlay .final-score {
+      font-size: 18px;
+      color: var(--neon-cyan);
+      margin-bottom: 8px;
+    }
+
+    .overlay .high-score-msg {
+      font-size: 12px;
+      color: var(--neon-green);
+      margin-bottom: 24px;
+      opacity: 0.8;
+    }
+
+    .overlay .high-score-msg.hidden {
+      display: none;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 30px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--neon-green);
+      background: transparent;
+      border: 1px solid var(--neon-green);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: rgba(0, 255, 65, 0.1);
+      box-shadow: var(--glow-green);
+      transform: scale(1.05);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    /* ============================================
+       START OVERLAY
+       ============================================ */
+    .start-overlay .overlay h2 {
+      font-size: 20px;
+      color: var(--neon-green);
+      letter-spacing: 4px;
+      animation: none;
+      text-shadow: var(--glow-green);
+    }
+
+    .start-overlay .overlay .final-score {
+      font-size: 12px;
+      color: var(--neon-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+
+    /* ============================================
+       FOOTER
+       ============================================ */
+    .footer {
+      font-size: 9px;
+      color: rgba(0, 255, 65, 0.3);
+      letter-spacing: 3px;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    @media (max-width: 520px) {
+      .header h1 { font-size: 20px; letter-spacing: 4px; }
+      .hud-value { font-size: 16px; min-width: 40px; }
+      .controls-info { flex-wrap: wrap; justify-content: center; }
+      .overlay-content { padding: 30px 30px; }
+      .overlay h2 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Matrix rain background canvas -->
+  <canvas id="matrix-rain"></canvas>
+  <!-- CRT scanline overlay -->
+  <div class="scanlines"></div>
+
+  <!-- Main game wrapper -->
+  <div class="game-wrapper">
+    <div class="header">
+      <h1>Snake</h1>
+      <div class="subtitle">// cyberprotocol v2.0</div>
+    </div>
+
+    <div class="hud">
+      <div class="hud-item">
+        <span class="hud-label">Score</span>
+        <span class="hud-value" id="score">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">High Score</span>
+        <span class="hud-value high-score" id="highScore">0</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Length</span>
+        <span class="hud-value" id="length">3</span>
+      </div>
+    </div>
+
+    <div class="canvas-frame">
+      <canvas id="gameCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <div class="controls-info">
+      <div class="key-group">
+        <span>MOVE</span>
+        <span class="key">W A S D</span>
+        <span class="key">↑ ← ↓ →</span>
+      </div>
+      <div class="key-group">
+        <span>PAUSE</span>
+        <span class="key">SPACE</span>
+      </div>
+      <div class="key-group">
+        <span>RESTART</span>
+        <span class="key">ENTER</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      PRESS ENTER TO START // NO EXTERNAL DEPENDENCIES
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay" id="gameOverOverlay">
+    <div class="overlay-content">
+      <h2>TERMINATED</h2>
+      <div class="final-score">SCORE: <span id="finalScore">0</span></div>
+      <div class="high-score-msg hidden" id="newHighScoreMsg">// NEW HIGH SCORE ESTABLISHED //</div>
+      <button class="btn" id="restartBtn">REBOOT</button>
+    </div>
+  </div>
+
+  <!-- Start Overlay -->
+  <div class="overlay start-overlay active" id="startOverlay">
+    <div class="overlay-content">
+      <h2>INITIALIZE SNAKE PROTOCOL</h2>
+      <div class="final-score">
+        COLLECT DATA NODES // AVOID COLLISION
+      </div>
+      <button class="btn" id="startBtn">INITIATE</button>
+    </div>
+  </div>
+
+  <script>
+    /* ============================================================
+       SNAKE // CYBERPROTOCOL
+       A complete Snake game with Matrix / Cyberpunk aesthetic.
+       Single-file, no dependencies.
+       ============================================================ */
+
+    // ============ CONFIGURATION ============
+    const CONFIG = {
+      GRID_SIZE: 30,          // Grid cells across (30x30)
+      CANVAS_SIZE: 600,       // Canvas pixel dimensions
+      CELL_SIZE: 20,          // Canvas size / grid size = 20px per cell
+      INITIAL_SPEED: 150,     // Starting tick interval (ms)
+      MIN_SPEED: 50,          // Fastest possible tick interval
+      SPEED_STEP: 2,          // ms reduction per food eaten
+      FOOD_COUNT: 1,          // Food items on screen at once
+    };
+
+    // Derived
+    CONFIG.TILE_COUNT = CONFIG.GRID_SIZE;
+    CONFIG.CELL_SIZE = CONFIG.CANVAS_SIZE / CONFIG.TILE_COUNT;
+
+    // ============ DOM ELEMENTS ============
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('highScore');
+    const lengthEl = document.getElementById('length');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const startOverlay = document.getElementById('startOverlay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const newHighScoreMsg = document.getElementById('newHighScoreMsg');
+    const restartBtn = document.getElementById('restartBtn');
+    const startBtn = document.getElementById('startBtn');
+
+    // ============ GAME STATE ============
+    let snake = [];            // Array of {x, y} objects (head at index 0)
+    let direction = { x: 1, y: 0 }; // Current movement direction
+    let nextDirection = { x: 1, y: 0 }; // Buffered next direction (prevents 180° turns)
+    let food = [];             // Array of {x, y} for food items
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('snakeCyber_highScore')) || 0;
+    let gameRunning = false;
+    let gamePaused = false;
+    let lastTick = 0;
+    let animFrameId = null;
+    let currentSpeed = CONFIG.INITIAL_SPEED;
+
+    // ============ HIGH SCORE ============
+    highScoreEl.textContent = highScore;
+
+    // ============ MATRIX RAIN (Background Effect) ============
+    const matrixCanvas = document.getElementById('matrix-rain');
+    const mCtx = matrixCanvas.getContext('2d');
+
+    function resizeMatrixCanvas() {
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+    }
+    resizeMatrixCanvas();
+    window.addEventListener('resize', resizeMatrixCanvas);
+
+    // Characters for the rain (katakana + latin + digits)
+    const matrixChars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+
+    const drops = [];
+    const FONT_SIZE = 14;
+
+    function initMatrixRain() {
+      const columns = Math.floor(matrixCanvas.width / FONT_SIZE);
+      drops.length = 0;
+      for (let i = 0; i < columns; i++) {
+        drops[i] = Math.random() * -100; // Start above screen randomly
+      }
+    }
+    initMatrixRain();
+    window.addEventListener('resize', initMatrixRain);
+
+    function drawMatrixRain() {
+      // Semi-transparent black to create fade trail
+      mCtx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+      mCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+
+      mCtx.fillStyle = '#00ff41';
+      mCtx.font = FONT_SIZE + 'px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        const x = i * FONT_SIZE;
+        const y = drops[i] * FONT_SIZE;
+
+        // Occasional brighter character for visual interest
+        if (Math.random() > 0.97) {
+          mCtx.fillStyle = '#ffffff';
+        } else {
+          mCtx.fillStyle = `rgba(0, 255, 65, ${0.3 + Math.random() * 0.7})`;
+        }
+
+        mCtx.fillText(char, x, y);
+
+        // Reset drop to top when it goes off screen
+        if (y > matrixCanvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i] += 0.5;
+      }
+    }
+
+    // ============ FOOD COLORS (Neon palette) ============
+    const FOOD_COLORS = [
+      '#00ff41', // green
+      '#00f0ff', // cyan
+      '#ff00ff', // magenta
+      '#ff6600', // orange
+    ];
+
+    // ============ GAME FUNCTIONS ============
+
+    /** Initialize a fresh game state */
+    function initGame() {
+      // Start snake in the center, length 3, moving right
+      const cx = Math.floor(CONFIG.TILE_COUNT / 2);
+      const cy = Math.floor(CONFIG.TILE_COUNT / 2);
+      snake = [
+        { x: cx, y: cy },
+        { x: cx - 1, y: cy },
+        { x: cx - 2, y: cy },
+      ];
+      direction = { x: 1, y: 0 };
+      nextDirection = { x: 1, y: 0 };
+      score = 0;
+      currentSpeed = CONFIG.INITIAL_SPEED;
+      scoreEl.textContent = '0';
+      lengthEl.textContent = snake.length;
+      spawnFood(CONFIG.FOOD_COUNT);
+    }
+
+    /** Place food items at random empty positions */
+    function spawnFood(count) {
+      for (let i = 0; i < count; i++) {
+        let pos;
+        let attempts = 0;
+        do {
+          pos = {
+            x: Math.floor(Math.random() * CONFIG.TILE_COUNT),
+            y: Math.floor(Math.random() * CONFIG.TILE_COUNT),
+          };
+          attempts++;
+        } while (isOccupied(pos) && attempts < 500);
+
+        if (attempts < 500) {
+          food.push(pos);
+        }
+      }
+    }
+
+    /** Check if a grid position is occupied by the snake or food */
+    function isOccupied(pos) {
+      return snake.some(s => s.x === pos.x && s.y === pos.y) ||
+             food.some(f => f.x === pos.x && f.y === pos.y);
+    }
+
+    /** Process one game tick: move snake, check collisions, eat food */
+    function tick() {
+      if (!gameRunning || gamePaused) return;
+
+      // Apply buffered direction
+      direction = { ...nextDirection };
+
+      // Calculate new head position
+      const head = {
+        x: snake[0].x + direction.x,
+        y: snake[0].y + direction.y,
+      };
+
+      // Wall collision (game over)
+      if (head.x < 0 || head.x >= CONFIG.TILE_COUNT ||
+          head.y < 0 || head.y >= CONFIG.TILE_COUNT) {
+        endGame();
+        return;
+      }
+
+      // Self collision (game over)
+      if (snake.some(s => s.x === head.x && s.y === head.y)) {
+        endGame();
+        return;
+      }
+
+      // Move snake: add new head
+      snake.unshift(head);
+
+      // Check if food was eaten
+      let ate = false;
+      food = food.filter(f => {
+        if (f.x === head.x && f.y === head.y) {
+          ate = true;
+          score += 10;
+          scoreEl.textContent = score;
+          lengthEl.textContent = snake.length;
+          // Increase speed (difficulty)
+          currentSpeed = Math.max(CONFIG.MIN_SPEED, currentSpeed - CONFIG.SPEED_STEP);
+          return false; // Remove this food
+        }
+        return true;
+      });
+
+      if (ate) {
+        spawnFood(CONFIG.FOOD_COUNT);
+      } else {
+        // Remove tail (snake moved without growing)
+        snake.pop();
+      }
+    }
+
+    /** End the game */
+    function endGame() {
+      gameRunning = false;
+
+      // Check high score
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('snakeCyber_highScore', highScore);
+        highScoreEl.textContent = highScore;
+        newHighScoreMsg.classList.remove('hidden');
+      } else {
+        newHighScoreMsg.classList.add('hidden');
+      }
+
+      finalScoreEl.textContent = score;
+      gameOverOverlay.classList.add('active');
+    }
+
+    /** Start the game loop */
+    function startGame() {
+      initGame();
+      gameRunning = true;
+      gamePaused = false;
+      lastTick = performance.now();
+      startOverlay.classList.remove('active');
+      gameOverOverlay.classList.remove('active');
+      requestAnimationFrame(gameLoop);
+    }
+
+    /** Main game loop using requestAnimationFrame + timing */
+    function gameLoop(timestamp) {
+      if (!gameRunning) return;
+
+      // Check if enough time has passed for the next tick
+      if (timestamp - lastTick >= currentSpeed) {
+        tick();
+        lastTick = timestamp;
+      }
+
+      // Always render the current state
+      render();
+      animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // ============ RENDERING ============
+
+    /** Draw the game on the canvas */
+    function render() {
+      const cs = CONFIG.CELL_SIZE;
+      const tc = CONFIG.TILE_COUNT;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw subtle grid
+      drawGrid(ctx, cs, tc);
+
+      // Draw food
+      food.forEach((f, i) => {
+        drawFood(f, cs);
+      });
+
+      // Draw snake
+      drawSnake(ctx, cs, tc);
+    }
+
+    /** Draw a subtle grid on the background */
+    function drawGrid(ctx, cs, tc) {
+      ctx.strokeStyle = 'rgba(0, 255, 65, 0.03)';
+      ctx.lineWidth = 0.5;
+
+      for (let i = 0; i <= tc; i++) {
+        const pos = i * cs;
+        ctx.beginPath();
+        ctx.moveTo(pos, 0);
+        ctx.lineTo(pos, tc * cs);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, pos);
+        ctx.lineTo(tc * cs, pos);
+        ctx.stroke();
+      }
+    }
+
+    /** Draw a single food item with glow effect */
+    function drawFood(pos, cs) {
+      const cx = pos.x * cs + cs / 2;
+      const cy = pos.y * cs + cs / 2;
+      const r = cs * 0.38;
+
+      // Outer glow
+      const colorIdx = Math.floor(Math.random() * FOOD_COLORS.length);
+      ctx.shadowColor = FOOD_COLORS[colorIdx];
+      ctx.shadowBlur = 15;
+
+      ctx.fillStyle = FOOD_COLORS[colorIdx];
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner bright core
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reset shadow for other draws
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+
+    /** Draw the entire snake with gradient coloring */
+    function drawSnake(ctx, cs, tc) {
+      const len = snake.length;
+
+      for (let i = len - 1; i >= 0; i--) {
+        const seg = snake[i];
+        const x = seg.x * cs;
+        const y = seg.y * cs;
+        const progress = i / len; // 0 = head, 1 = tail
+
+        // Color gradient: head = cyan, body = green, tail fades to dark
+        let r, g, b;
+        if (i === 0) {
+          // Head: bright cyan
+          r = 0; g = 240; b = 255;
+        } else if (progress < 0.3) {
+          // Near head: green-cyan mix
+          const t = progress / 0.3;
+          r = 0;
+          g = Math.round(255 - t * 15);
+          b = Math.round(65 + t * 190);
+        } else {
+          // Tail: green fading to dark
+          const t = (progress - 0.3) / 0.7;
+          r = Math.round(0);
+          g = Math.round(255 - t * 200);
+          b = Math.round(65 - t * 50);
+        }
+
+        const color = `rgb(${r},${g},${b})`;
+
+        // Glow on head only
+        if (i === 0) {
+          ctx.shadowColor = '#00f0ff';
+          ctx.shadowBlur = 12;
+        }
+
+        // Draw the segment as a rounded rectangle
+        const inset = i === 0 ? 1 : 2;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + inset, y + inset, cs - inset * 2, cs - inset * 2);
+
+        // Draw subtle border
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.5)`;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x + inset, y + inset, cs - inset * 2, cs - inset * 2);
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Draw eyes on head
+        if (i === 0) {
+          drawEyes(seg, cs, ctx);
+        }
+      }
+    }
+
+    /** Draw eyes on the snake head based on direction */
+    function drawEyes(pos, cs, ctx) {
+      const cx = pos.x * cs + cs / 2;
+      const cy = pos.y * cs + cs / 2;
+      const eyeR = cs * 0.1;
+      const eyeOffset = cs * 0.25;
+
+      ctx.fillStyle = '#000';
+
+      let eyes;
+      if (direction.x === 1) {
+        eyes = [
+          { x: cx + eyeOffset, y: cy - eyeOffset },
+          { x: cx + eyeOffset, y: cy + eyeOffset },
+        ];
+      } else if (direction.x === -1) {
+        eyes = [
+          { x: cx - eyeOffset, y: cy - eyeOffset },
+          { x: cx - eyeOffset, y: cy + eyeOffset },
+        ];
+      } else if (direction.y === -1) {
+        eyes = [
+          { x: cx - eyeOffset, y: cy - eyeOffset },
+          { x: cx + eyeOffset, y: cy - eyeOffset },
+        ];
+      } else {
+        eyes = [
+          { x: cx - eyeOffset, y: cy + eyeOffset },
+          { x: cx + eyeOffset, y: cy + eyeOffset },
+        ];
+      }
+
+      eyes.forEach(eye => {
+        ctx.beginPath();
+        ctx.arc(eye.x, eye.y, eyeR, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Pupil (brighter)
+      ctx.fillStyle = '#fff';
+      eyes.forEach(eye => {
+        ctx.beginPath();
+        ctx.arc(eye.x, eye.y, eyeR * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // ============ INPUT HANDLING ============
+    document.addEventListener('keydown', (e) => {
+      const key = e.key;
+
+      // Prevent default for game keys
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(key)) {
+        e.preventDefault();
+      }
+
+      // Restart on Enter (when game is over or paused)
+      if (key === 'Enter') {
+        if (!gameRunning) {
+          startGame();
+        }
+        return;
+      }
+
+      // Pause on Space
+      if (key === ' ') {
+        if (gameRunning) {
+          gamePaused = !gamePaused;
+        }
+        return;
+      }
+
+      // Direction changes (only when running)
+      if (!gameRunning || gamePaused) return;
+
+      // Prevent 180° turns (can't go opposite of current direction)
+      const isOpposite = (dx, dy) =>
+        (dx === -direction.x && dy === -direction.y);
+
+      switch (key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          if (!isOpposite(0, -1)) nextDirection = { x: 0, y: -1 };
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          if (!isOpposite(0, 1)) nextDirection = { x: 0, y: 1 };
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          if (!isOpposite(-1, 0)) nextDirection = { x: -1, y: 0 };
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          if (!isOpposite(1, 0)) nextDirection = { x: 1, y: 0 };
+          break;
+      }
+    });
+
+    // Button handlers
+    restartBtn.addEventListener('click', startGame);
+    startBtn.addEventListener('click', startGame);
+
+    // ============ MATRIX RAIN LOOP ============
+    (function matrixLoop() {
+      drawMatrixRain();
+      requestAnimationFrame(matrixLoop);
+    })();
+
+    // ============ INITIAL RENDER (show empty grid before start) ============
+    initGame();
+    render();
+
+    // ============ WINDOW RESIZE: adjust canvas if needed ============
+    // The canvas is fixed at 600x600; the CSS frame scales responsively.
+  </script>
+</body>
+</html>

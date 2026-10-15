@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cyberpunk Snake</title>
+<style>
+  body {
+    margin:0;
+    overflow:hidden;
+    background:#000;
+    font-family:'Courier New',monospace;
+    color:#0f0;
+  }
+  canvas {
+    display:block;
+    background:#000;
+  }
+  /* Digital rain effect */
+  #rain {
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    background: repeating-linear-gradient(45deg, transparent, transparent 2px, #0f0 2px, #0f0 4px);
+    opacity:0.6;
+    animation: rainMove 2s linear infinite;
+  }
+  @keyframes rainMove {
+    from { background-position: 0 0; }
+    to { background-position: 0 20px; }
+  }
+  /* Glitch effect */
+  .glitch {
+    animation: glitch 0.5s infinite;
+  }
+  @keyframes glitch {
+    0%   { clip-path: inset(0 0 0 0); }
+    10%  { clip-path: inset(0 0 0 5%); }
+    20%  { clip-path: inset(0 0 10% 0); }
+    30%  { clip-path: inset(0 0 0 15%); }
+    40%  { clip-path: inset(0 0 10% 0); }
+    50%  { clip-path: inset(0 0 0 5%); }
+    60%  { clip-path: inset(0 0 0 0); }
+    100% { clip-path: inset(0 0 0 0); }
+  }
+  /* Scanlines overlay */
+  .scanlines {
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.02) 1px, rgba(255,255,255,0.02) 2px);
+    opacity:0.3;
+    animation: scan 2s linear infinite;
+  }
+  @keyframes scan {
+    from { background-position: 0 0; }
+    to { background-position: 0 20px; }
+  }
+  /* UI elements */
+  #score, #highscore {
+    position:fixed;
+    top:10px;
+    left:10px;
+    color:#0ff;
+    font-size:1.2rem;
+    text-shadow:0 0 5px #0f0;
+    z-index:10;
+  }
+  #gameover {
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(0,0,0,0.8);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    color:#0ff;
+    font-size:3rem;
+    text-shadow:0 0 10px #0f0;
+    display:none;
+    z-index:20;
+  }
+</style>
+</head>
+<body>
+<div id="rain"></div>
+<canvas id="game"></canvas>
+<div class="scanlines"></div>
+<div id="score">Score: 0</div>
+<div id="highscore">High Score: 0</div>
+<div id="gameover">GAME OVER</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const highscoreEl = document.getElementById('highscore');
+  const gameoverEl = document.getElementById('gameover');
+
+  // Game constants
+  const CELL_SIZE = 20;
+  let gridWidth, gridHeight; // will be set on resize
+
+  // Game state
+  let snake = [{x: 10, y: 10}];
+  let direction = 'right';
+  let nextDirection = direction;
+  let food = {x: 0, y: 0};
+  let score = 0;
+  let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+  let running = true;
+  let moveDelay = 100; // ms per step, lower = faster
+  let moveInterval;
+
+  // Initialize canvas size and grid
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gridWidth = Math.floor(canvas.width / CELL_SIZE);
+    gridHeight = Math.floor(canvas.height / CELL_SIZE);
+    // Ensure food is within new grid
+    food = getRandomFood();
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // Helper: random food position (avoid snake)
+  function getRandomFood() {
+    let pos;
+    do {
+      pos = {
+        x: Math.floor(Math.random() * gridWidth),
+        y: Math.floor(Math.random() * gridHeight)
+      };
+    } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+    return pos;
+  }
+
+  // Update high score display
+  function updateHighScoreDisplay() {
+    highscoreEl.textContent = `High Score: ${highScore}`;
+  }
+
+  // Main game step
+  function gameStep() {
+    // Apply queued direction
+    direction = nextDirection;
+
+    // Compute new head position
+    const head = { ...snake[0] };
+    switch (direction) {
+      case 'up':    head.y--; break;
+      case 'down':  head.y++; break;
+      case 'left':  head.x--; break;
+      case 'right': head.x++; break;
+    }
+
+    // Wall collision
+    if (head.x < 0 || head.x >= gridWidth || head.y < 0 || head.y >= gridHeight) {
+      endGame();
+      return;
+    }
+
+    // Self collision
+    if (snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+      endGame();
+      return;
+    }
+
+    // Add new head
+    snake.unshift(head);
+
+    // Food check
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('snakeHighScore', highScore);
+      }
+      updateHighScoreDisplay();
+      food = getRandomFood();
+    } else {
+      // Remove tail
+      snake.pop();
+    }
+
+    // Speed increases as snake grows (decrease delay)
+    moveDelay = Math.max(30, 100 - snake.length * 5);
+    clearInterval(moveInterval);
+    moveInterval = setInterval(gameStep, moveDelay);
+
+    // Render
+    draw();
+  }
+
+  // Game over handling
+  function endGame() {
+    running = false;
+    clearInterval(moveInterval);
+    gameoverEl.textContent = `GAME OVER\nScore: ${score}\nHigh Score: ${highScore}`;
+    gameoverEl.style.display = 'flex';
+  }
+
+  // Restart game
+  function resetGame() {
+    snake = [{x: 10, y: 10}];
+    direction = 'right';
+    nextDirection = direction;
+    score = 0;
+    highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+    updateHighScoreDisplay();
+    document.getElementById('score').textContent = `Score: ${score}`;
+    gameoverEl.style.display = 'none';
+    running = true;
+    moveDelay = 100;
+    clearInterval(moveInterval);
+    moveInterval = setInterval(gameStep, moveDelay);
+  }
+
+  // Draw everything
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Snake
+    ctx.fillStyle = '#0f0';
+    snake.forEach(seg => {
+      ctx.fillRect(seg.x * CELL_SIZE, seg.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    });
+
+    // Food
+    ctx.fillStyle = '#0ff';
+    ctx.fillRect(food.x * CELL_SIZE, food.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+    // UI
+    ctx.fillStyle = '#0ff';
+    ctx.font = '18px "Courier New", monospace';
+    ctx.fillText(`Score: ${score}`, 10, 30);
+    ctx.fillText(`High Score: ${highScore}`, 10, 50);
+  }
+
+  // Keyboard controls
+  window.addEventListener('keydown', e => {
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'w':
+        if (direction !== 'down') nextDirection = 'up';
+        break;
+      case 'ArrowDown':
+      case 's':
+        if (direction !== 'up') nextDirection = 'down';
+        break;
+      case 'ArrowLeft':
+      case 'a':
+        if (direction !== 'right') nextDirection = 'left';
+        break;
+      case 'ArrowRight':
+      case 'd':
+        if (direction !== 'left') nextDirection = 'right';
+        break;
+    }
+  });
+
+  // Start the game loop
+  function start() {
+    updateHighScoreDisplay();
+    moveInterval = setInterval(gameStep, moveDelay);
+  }
+
+  // Init
+  start();
+
+  // Optional: allow restart by pressing any key after game over
+  window.addEventListener('keydown', e => {
+    if (!running && gameoverEl.style.display === 'flex') {
+      resetGame();
+    }
+  });
+})();
+</script>
+</body>
+</html>

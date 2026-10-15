@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SNAKE // MATRIX_PROTOCOL</title>
+<style>
+  /* ============================================================
+     GLOBAL RESET & BASE STYLES
+     Cyberpunk / Matrix terminal aesthetic
+     ============================================================ */
+  :root {
+    --neon-green: #00ff41;
+    --neon-green-dim: #0b6e2c;
+    --cyan: #00f0ff;
+    --magenta: #ff00de;
+    --bg-dark: #000a06;
+    --panel: rgba(0, 255, 65, 0.04);
+    --border: rgba(0, 255, 65, 0.35);
+    --font-mono: "Courier New", "Cascadia Code", "Lucida Console", monospace;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg-dark);
+    font-family: var(--font-mono);
+    color: var(--neon-green);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Subtle CRT screen vignette overlay fixed behind everything */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+  }
+
+  /* ============================================================
+     MATRIX DIGIT RAIN CANVAS (background)
+     ============================================================ */
+  #matrix {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    display: block;
+  }
+
+  /* Scanlines + flicker overlay on top of rain */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 255, 65, 0.03) 3px,
+      transparent 4px
+    );
+    animation: scanflick 0.12s infinite steps(2);
+  }
+
+  @keyframes scanflick {
+    0% { opacity: 0.9; }
+    50% { opacity: 1; }
+    100% { opacity: 0.85; }
+  }
+
+  /* ============================================================
+     MAIN GAME UI
+     ============================================================ */
+  #game-shell {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+    padding: 16px;
+  }
+
+  /* Header / HUD */
+  #hud {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 18px;
+    margin-bottom: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 0 18px rgba(0, 255, 65, 0.15),
+      inset 0 0 12px rgba(0, 255, 65, 0.08);
+    backdrop-filter: blur(2px);
+  }
+
+  .brand {
+    font-size: 1.35rem;
+    font-weight: bold;
+    letter-spacing: 4px;
+    text-shadow: 0 0 8px var(--neon-green), 0 0 18px var(--neon-green-dim);
+  }
+
+  .brand .accent {
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+
+  .stat-block {
+    display: flex;
+    gap: 22px;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .stat .label {
+    font-size: 0.6rem;
+    opacity: 0.6;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .stat .value {
+    font-size: 1.15rem;
+    font-weight: bold;
+    text-shadow: 0 0 8px var(--neon-green);
+  }
+
+  .stat .value.cyan {
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+
+  /* ============================================================
+     GAME CANVAS FRAME
+     ============================================================ */
+  .canvas-frame {
+    position: relative;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: rgba(0, 5, 3, 0.72);
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.25),
+      inset 0 0 30px rgba(0, 255, 65, 0.06);
+    padding: 3px;
+  }
+
+  #game {
+    display: block;
+    background: rgba(0, 6, 3, 0.85);
+    border-radius: 5px;
+    image-rendering: pixelated;
+  }
+
+  /* Decorative corner nodes */
+  .frame-tag {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+    opacity: 0.5;
+    text-transform: uppercase;
+  }
+
+  /* ============================================================
+     OVERLAY SCREENS (start / game over)
+     ============================================================ */
+  .overlay {
+    position: absolute;
+    inset: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(0, 6, 3, 0.86);
+    border-radius: 5px;
+    z-index: 30;
+    backdrop-filter: blur(3px);
+  }
+
+  .overlay.hidden {
+    display: none;
+  }
+
+  .glitch-title {
+    font-size: 2.6rem;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: var(--neon-green);
+    text-shadow: 0 0 12px var(--neon-green);
+    position: relative;
+    animation: glitch 2.6s infinite;
+  }
+
+  /* RGB-split glitch effect on the title */
+  @keyframes glitch {
+    0%, 100% {
+      text-shadow: 0 0 12px var(--neon-green),
+        2px 0 var(--magenta), -2px 0 var(--cyan);
+    }
+    20% {
+      text-shadow: 0 0 12px var(--neon-green),
+        -3px 0 var(--magenta), 3px 0 var(--cyan);
+    }
+    40% {
+      text-shadow: 0 0 12px var(--neon-green),
+        3px 2px var(--magenta), -3px -2px var(--cyan);
+    }
+    60% {
+      text-shadow: 0 0 12px var(--neon-green),
+        -2px 0 var(--magenta), 2px 0 var(--cyan);
+    }
+  }
+
+  .subtitle {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+
+  .overlay p {
+    margin: 18px 0;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    opacity: 0.85;
+    max-width: 420px;
+    letter-spacing: 1px;
+  }
+
+  .overlay .big-score {
+    font-size: 1.4rem;
+    margin: 10px 0 4px;
+    color: var(--neon-green);
+    text-shadow: 0 0 10px var(--neon-green);
+    letter-spacing: 2px;
+  }
+
+  .overlay .new-best {
+    color: var(--magenta);
+    text-shadow: 0 0 10px var(--magenta);
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    animation: pulse 0.9s infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { opacity: 0.5; }
+    to { opacity: 1; }
+  }
+
+  /* Cyber button */
+  .cyber-btn {
+    margin-top: 14px;
+    padding: 12px 34px;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    letter-spacing: 3px;
+    font-weight: bold;
+    color: var(--neon-green);
+    background: transparent;
+    border: 2px solid var(--neon-green);
+    border-radius: 5px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
+    box-shadow: 0 0 14px rgba(0, 255, 65, 0.3),
+      inset 0 0 12px rgba(0, 255, 65, 0.12);
+  }
+
+  .cyber-btn:hover {
+    background: rgba(0, 255, 65, 0.12);
+    box-shadow: 0 0 26px rgba(0, 255, 65, 0.6),
+      inset 0 0 18px rgba(0, 255, 65, 0.2);
+    color: #eaffef;
+  }
+
+  .cyber-btn:active {
+    transform: scale(0.96);
+  }
+
+  .controls-hint {
+    margin-top: 16px;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    opacity: 0.5;
+  }
+
+  .controls-hint kbd {
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin: 0 1px;
+    color: var(--cyan);
+  }
+
+  .version {
+    position: fixed;
+    bottom: 6px;
+    right: 10px;
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    opacity: 0.35;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+  <!-- Matrix digit-rain background -->
+  <canvas id="matrix"></canvas>
+  <!-- Scanline overlay -->
+  <div class="scanlines"></div>
+
+  <!-- Main game shell -->
+  <div id="game-shell">
+    <!-- HUD: title + score / high-score stats -->
+    <div id="hud">
+      <div class="brand">SNAKE_<span class="accent">PROTOCOL</span></div>
+      <div class="stat-block">
+        <div class="stat">
+          <span class="label">Score</span>
+          <span class="value" id="score">0</span>
+        </div>
+        <div class="stat">
+          <span class="label">Best</span>
+          <span class="value cyan" id="highScore">0</span>
+        </div>
+        <div class="stat">
+          <span class="label">Level</span>
+          <span class="value" id="level">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas wrapped in a glowing frame -->
+    <div class="canvas-frame">
+      <canvas id="game" width="480" height="480"></canvas>
+
+      <!-- Start overlay -->
+      <div class="overlay" id="startOverlay">
+        <div class="glitch-title">SNAKE</div>
+        <div class="subtitle">// MATRIX_PROTOCOL v1.5</div>
+        <p>
+          Infiltrate the grid. Consume the data packets.<br />
+          Do not bite the tail — the system will hunt you down.
+        </p>
+        <button class="cyber-btn" id="startBtn">[ INITIALIZE ]</button>
+        <div class="controls-hint">
+          Move: <kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8592;</kbd><kbd>&#8594;</kbd>
+          / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;&bull;&nbsp;
+          Pause: <kbd>SPC</kbd>
+        </div>
+      </div>
+
+      <!-- Game over overlay -->
+      <div class="overlay hidden" id="overOverlay">
+        <div class="glitch-title">SYSTEM_FAIL</div>
+        <div class="subtitle">// CONNECTION TERMINATED</div>
+        <div class="big-score" id="finalScore">SCORE: 0</div>
+        <div class="new-best hidden" id="newBest">★ NEW HIGH SCORE ★</div>
+        <button class="cyber-btn" id="restartBtn">[ RECONNECT ]</button>
+        <div class="controls-hint">Press <kbd>SPC</kbd> or <kbd>ENTER</kbd> to retry</div>
+      </div>
+    </div>
+
+    <div class="frame-tag">
+      <span>GRID_40x40</span>
+      <span>STATUS: <span id="statusText">STANDBY</span></span>
+      <span>SRV://NEON_NET</span>
+    </div>
+  </div>
+
+  <div class="version">// built 2026 // no dependencies</div>
+
+<script>
+/* ============================================================
+   PART 1 — MATRIX DIGIT RAIN (background effect)
+   Draws falling columns of green characters, classic Matrix style.
+   ============================================================ */
+(function matrixRain() {
+  const canvas = document.getElementById("matrix");
+  const ctx = canvas.getContext("2d");
+
+  const CHARACTERS = "アイウエオカキクケコ0123456789ABCDEF<>[]{}#%*$+=";
+  let cols = 0;
+  let drops = [];
+  const FONT_SIZE = 15;
+
+  // Resize the rain canvas to fill the window.
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.floor(canvas.width / FONT_SIZE);
+    // Each column holds the y-row of its current character (in grid units).
+    drops = new Array(cols).fill(1);
+  }
+
+  // A random glyph per frame for each active column.
+  function randomChar() {
+    return CHARACTERS.charAt(Math.floor(Math.random() * CHARACTERS.length));
+  }
+
+  function draw() {
+    // Translucent black trail: fades previous frames rather than clearing.
+    ctx.fillStyle = "rgba(0, 10, 6, 0.08)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = FONT_SIZE + "px monospace";
+
+    for (let i = 0; i < drops.length; i++) {
+      const ch = randomChar();
+      const x = i * FONT_SIZE;
+      const y = drops[i] * FONT_SIZE;
+
+      // Leading character is bright white-cyan; trail is green.
+      ctx.fillStyle = "rgba(120, 255, 180, 0.95)";
+      ctx.fillText(ch, x, y);
+
+      // Occasionally render a magenta/cyan glyph for color variance.
+      if (Math.random() < 0.04) {
+        ctx.fillStyle = Math.random() < 0.5 ? "#ff00de" : "#00f0ff";
+        ctx.fillText(ch, x, y);
+      }
+
+      // Reset the column to the top once it exits the screen, with jitter.
+      if (y > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      drops[i]++;
+    }
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  setInterval(draw, 45); // ~22 fps for the rain (deliberately slow)
+})();
+
+/* ============================================================
+   PART 2 — THE SNAKE GAME
+   ============================================================ */
+(function () {
+  // ---- DOM references ----
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const highScoreEl = document.getElementById("highScore");
+  const levelEl = document.getElementById("level");
+  const statusEl = document.getElementById("statusText");
+  const startOverlay = document.getElementById("startOverlay");
+  const overOverlay = document.getElementById("overOverlay");
+  const finalScoreEl = document.getElementById("finalScore");
+  const newBestEl = document.getElementById("newBest");
+  const startBtn = document.getElementById("startBtn");
+  const restartBtn = document.getElementById("restartBtn");
+
+  // ---- Grid configuration ----
+  const TILE = 12;                              // pixels per grid cell
+  const COLS = canvas.width / TILE;             // 480 / 12 = 40
+  const ROWS = canvas.height / TILE;            // 480 / 12 = 40
+
+  // ---- Game state ----
+  let snake, dir, nextDir, food, score, level;
+  let tickMs;                    // interval between moves (gets smaller)
+  let loopId = null;             // requestAnimationFrame id
+  let lastStep = 0;              // timestamp of last move
+  let running = false;
+  let paused = false;
+  let highScore = parseInt(localStorage.getItem("snake_high_score") || "0", 10);
+  let particles = [];            // burst effect on eating food
+
+  highScoreEl.textContent = highScore;
+
+  // ---- Speed tiers: level -> move interval (ms). Game gets faster as you grow. ----
+  function levelForScore(s) {
+    return Math.floor(s / 5) + 1;
+  }
+  function tickForLevel(lvl) {
+    // Starts at 140ms, drops 8ms per level, floors at 45ms.
+    return Math.max(45, 140 - (lvl - 1) * 8);
+  }
+
+  // ---- Reset everything into a fresh game ----
+  function initGame() {
+    const mid = Math.floor(COLS / 2);
+    const midY = Math.floor(ROWS / 2);
+    snake = [
+      { x: mid, y: midY },
+      { x: mid - 1, y: midY },
+      { x: mid - 2, y: midY },
+    ];
+    dir = { x: 1, y: 0 };        // moving right
+    nextDir = { x: 1, y: 0 };
+    score = 0;
+    level = 1;
+    tickMs = tickForLevel(level);
+    particles = [];
+    placeFood();
+    updateHUD();
+    statusEl.textContent = "RUNNING";
+  }
+
+  // ---- Place food at a random empty cell ----
+  function placeFood() {
+    let p;
+    do {
+      p = {
+        x: Math.floor(Math.random() * COLS),
+        y: Math.floor(Math.random() * ROWS),
+      };
+    } while (snake.some((s) => s.x === p.x && s.y === p.y));
+    food = p;
+  }
+
+  // ---- Spawn a little neon burst where food was eaten ----
+  function burst(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.3 + Math.random() * 0.9;
+      particles.push({
+        x: x * TILE + TILE / 2,
+        y: y * TILE + TILE / 2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+      });
+    }
+  }
+
+  // ---- Update the on-screen HUD numbers ----
+  function updateHUD() {
+    scoreEl.textContent = score;
+    levelEl.textContent = level;
+    highScoreEl.textContent = highScore;
+  }
+
+  // ============================================================
+  //  UPDATE logic — movement, collision, eating
+  // ============================================================
+  function update() {
+    // Commit the queued direction (prevent 180-degree reversals).
+    dir = nextDir;
+
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // Wall collision -> game over.
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+      return gameOver();
+    }
+    // Self collision -> game over.
+    if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+      return gameOver();
+    }
+
+    snake.unshift(head); // grow toward new head
+
+    // Eating food.
+    if (head.x === food.x && head.y === food.y) {
+      score += 1;
+      burst(food.x, food.y);
+      const newLevel = levelForScore(score);
+      if (newLevel !== level) {
+        level = newLevel;
+        tickMs = tickForLevel(level);
+      }
+      updateHUD();
+      placeFood();
+    } else {
+      snake.pop(); // move without growing
+    }
+  }
+
+  // ============================================================
+  //  RENDER — draw grid, snake, food, particles
+  // ============================================================
+  function draw() {
+    // Clear the playfield.
+    ctx.fillStyle = "rgba(0, 6, 3, 0.9)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Subtle grid lines for the terminal look.
+    ctx.strokeStyle = "rgba(0, 255, 65, 0.05)";
+    ctx.lineWidth = 1;
+    for (let c = 1; c < COLS; c++) {
+      ctx.beginPath();
+      ctx.moveTo(c * TILE, 0);
+      ctx.lineTo(c * TILE, canvas.height);
+      ctx.stroke();
+    }
+    for (let r = 1; r < ROWS; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, r * TILE);
+      ctx.lineTo(canvas.width, r * TILE);
+      ctx.stroke();
+    }
+
+    // Draw the food — a pulsing magenta data packet.
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 180);
+    const fpad = 2 - pulse * 0.6;
+    ctx.save();
+    ctx.shadowBlur = 12 + pulse * 10;
+    ctx.shadowColor = "#ff00de";
+    ctx.fillStyle = "#ff00de";
+    ctx.fillRect(
+      food.x * TILE + fpad,
+      food.y * TILE + fpad,
+      TILE - fpad * 2,
+      TILE - fpad * 2
+    );
+    ctx.restore();
+
+    // Draw the snake. Head is cyan, body fades green toward the tail.
+    for (let i = snake.length - 1; i >= 0; i--) {
+      const seg = snake[i];
+      const isHead = i === 0;
+
+      ctx.save();
+      if (isHead) {
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = "#00f0ff";
+        ctx.fillStyle = "#00f0ff";
+      } else {
+        // Body color shifts from bright green toward dim green along length.
+        const t = i / Math.max(1, snake.length);
+        const g = Math.round(255 - t * 170);
+        ctx.fillStyle = `rgb(0, ${g}, ${Math.round(g * 0.5)})`;
+      }
+      const pad = isHead ? 1 : 2;
+      ctx.fillRect(
+        seg.x * TILE + pad,
+        seg.y * TILE + pad,
+        TILE - pad * 2,
+        TILE - pad * 2
+      );
+      ctx.restore();
+    }
+
+    // Draw the snake's eyes on the head for a little character.
+    if (snake.length) {
+      const h = snake[0];
+      ctx.fillStyle = "#00120a";
+      const cx = h.x * TILE;
+      const cy = h.y * TILE;
+      // Offset eyes based on direction for a facing look.
+      const ex = dir.x * 2;
+      const ey = dir.y * 2;
+      ctx.beginPath();
+      ctx.arc(cx + TILE / 2 - 3 + ex, cy + TILE / 2 - 3 + ey, 1.4, 0, 7);
+      ctx.arc(cx + TILE / 2 + 3 + ex, cy + TILE / 2 - 3 + ey, 1.4, 0, 7);
+      ctx.arc(cx + TILE / 2 - 3 + ex, cy + TILE / 2 + 3 + ey, 1.4, 0, 7);
+      ctx.arc(cx + TILE / 2 + 3 + ex, cy + TILE / 2 + 3 + ey, 1.4, 0, 7);
+      ctx.fill();
+    }
+
+    // Update + draw particle bursts.
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * 3;
+      p.y += p.vy * 3;
+      p.life -= 0.04;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = "#00ff41";
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#00ff41";
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+      ctx.restore();
+    }
+  }
+
+  // ============================================================
+  //  MAIN LOOP — frames on rAF, but snake moves on a fixed tick
+  //  (decoupled so speed-up doesn't feel janky)
+  // ============================================================
+  function frame(ts) {
+    if (!running) return;
+    loopId = requestAnimationFrame(frame);
+
+    if (paused) {
+      draw(); // still render so the frame stays frozen cleanly
+      return;
+    }
+
+    if (ts - lastStep >= tickMs) {
+      lastStep = ts;
+      update();
+      if (!running) return; // gameOver() set running=false during update
+    }
+    draw();
+  }
+
+  // ============================================================
+  //  START / GAME OVER / PAUSE
+  // ============================================================
+  function startGame() {
+    initGame();
+    startOverlay.classList.add("hidden");
+    overOverlay.classList.add("hidden");
+    running = true;
+    paused = false;
+    lastStep = performance.now();
+    loopId = requestAnimationFrame(frame);
+  }
+
+  function gameOver() {
+    running = false;
+    cancelAnimationFrame(loopId);
+    statusEl.textContent = "TERMINATED";
+
+    const newHigh = score > highScore;
+    if (newHigh) {
+      highScore = score;
+      localStorage.setItem("snake_high_score", String(highScore));
+    }
+    updateHUD();
+
+    finalScoreEl.textContent = "SCORE: " + score;
+    newBestEl.classList.toggle("hidden", !newHigh);
+    overOverlay.classList.remove("hidden");
+  }
+
+  function togglePause() {
+    if (!running) return;
+    paused = !paused;
+    statusEl.textContent = paused ? "PAUSED" : "RUNNING";
+  }
+
+  // ============================================================
+  //  INPUT — arrow keys + WASD, plus space/enter shortcuts
+  // ============================================================
+  function setDir(nx, ny) {
+    // Prevent reversing directly into the snake's own neck.
+    if (nx === -dir.x && ny === -dir.y) return;
+    nextDir = { x: nx, y: ny };
+  }
+
+  const KEYMAP = {
+    ArrowUp: [0, -1], KeyW: [0, -1],
+    ArrowDown: [0, 1], KeyS: [0, 1],
+    ArrowLeft: [-1, 0], KeyA: [-1, 0],
+    ArrowRight: [1, 0], KeyD: [1, 0],
+  };
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code in KEYMAP) {
+      e.preventDefault();
+      setDir(...KEYMAP[e.code]);
+    } else if (e.code === "Space") {
+      e.preventDefault();
+      if (overOverlay.classList.contains("hidden")) {
+        togglePause();
+      } else {
+        startGame();
+      }
+    } else if (e.code === "Enter") {
+      e.preventDefault();
+      if (!overOverlay.classList.contains("hidden")) {
+        startGame();
+      }
+    }
+  });
+
+  startBtn.addEventListener("click", startGame);
+  restartBtn.addEventListener("click", startGame);
+
+  // ---- Initial paint behind the start overlay ----
+  initGame();
+  draw();
+})();
+</script>
+</body>
+</html>
