@@ -118,17 +118,19 @@ def resolve_title(entry: dict):
     return game_title(ROOT / entry["file"])
 
 
-def render_card(entry: dict, index: int, title: str) -> str:
+def render_card(entry: dict, index: int, title: str, is_new: bool = False) -> str:
     game = html_mod.escape(entry["file"], quote=True)
     attr_title = html_mod.escape(title, quote=True)
     attr_model = html_mod.escape(entry["model"], quote=True)
     counter = html_mod.escape(entry["counter"], quote=True)
     added = f' data-added="{html_mod.escape(entry["added"], quote=True)}"' if entry.get("added") else ""
+    classes = "card card-new" if is_new else "card"
+    tag = '<span class="new-tag">new</span>' if is_new else ""
     lines = [
-        f'<article class="card" tabindex="0" role="button" data-game="{game}" '
+        f'<article class="{classes}" tabindex="0" role="button" data-game="{game}" '
         f'data-title="{attr_title}" data-model="{attr_model}" data-counter="{counter}"{added}>',
         f'    <div class="card-index">{index:02d}</div>',
-        f'    <div class="card-model">{html_mod.escape(entry["model"])}</div>',
+        f'    <div class="card-model">{html_mod.escape(entry["model"])}{tag}</div>',
         f'    <div class="card-title">{html_mod.escape(title)}</div>',
     ]
     if entry.get("warn"):
@@ -136,12 +138,11 @@ def render_card(entry: dict, index: int, title: str) -> str:
             f'    <a class="card-warn" href="{game}" target="_blank" rel="noopener">'
             f'⚠ {html_mod.escape(entry["warn"])}</a>'
         )
-    lines.append(
-        f'    <div class="card-meta"><span>size <b>{size_kb(ROOT / entry["file"])} KB</b></span>'
-        f'<span>self-contained</span><span>plays <b class="plays-count">—</b></span></div>'
-    )
+    meta = [f'<span>size <b>{size_kb(ROOT / entry["file"])} KB</b></span>']
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry.get("added") or ""):
-        lines.append(f'    <div class="card-added">added <b>{display_date(entry["added"])}</b></div>')
+        meta.append(f'<span>added <b>{display_date(entry["added"])}</b></span>')
+    meta.append('<span>plays <b class="plays-count">—</b></span>')
+    lines.append('    <div class="card-meta">' + "".join(meta) + '</div>')
     lines.append('    <button class="play-btn" tabindex="-1">▶ Play</button>')
     lines.append('  </article>')
     return "\n".join(lines)
@@ -182,9 +183,13 @@ def build_document(text: str, entries: list[dict]):
     ordered = sorted(entries, key=lambda e: natural_key(e["model"]))
     ordered = sorted(ordered, key=lambda e: e.get("added") or "", reverse=True)
     count = len(ordered)
+    latest = max((e.get("added") or "" for e in ordered), default="")  # newest batch -> "new" badge
 
     cards = "\n\n".join(
-        render_card(entry, i + 1, resolve_title(entry))
+        render_card(
+            entry, i + 1, resolve_title(entry),
+            is_new=bool(latest) and entry.get("added") == latest,
+        )
         for i, entry in enumerate(ordered)
     )
     region = CARDS_RE.search(text)
