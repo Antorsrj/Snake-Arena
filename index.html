@@ -778,10 +778,21 @@ Make the game visually impressive and atmospheric while remaining fully playable
 
 /* ---------- play counters (abacus counting api) ---------- */
 (function(){
-  const API     = 'https://abacus.jasoncameron.dev/hit/snake-arena/';
+  const NS    = 'snake-arena-plays';
+  const GET   = 'https://abacus.jasoncameron.dev/get/' + NS + '/';
+  const HIT   = 'https://abacus.jasoncameron.dev/hit/' + NS + '/';
+  const CACHE = 'snake-arena:counts:' + NS;
+  const TTL   = 10 * 60 * 1000;   // re-read from the api at most every 10 minutes
+  const PACE  = 400;              // ms between reads — the api allows 30 requests / 10s
+
   const fmt     = n => Number(n).toLocaleString('en-US');
   const totalEl = document.getElementById('total-plays');
-  let total = 0, anyOk = false;
+  const cards   = [...document.querySelectorAll('.card')]
+    .map(card => ({ key: card.dataset.counter, el: card.querySelector('.plays-count') }))
+    .filter(c => c.key && c.el);
+  const elFor   = new Map(cards.map(c => [c.key, c.el]));
+  const values  = {};
+  let   total   = 0, anyOk = false;
 
   function showTotal(){
     if (anyOk && totalEl){
@@ -790,33 +801,78 @@ Make the game visually impressive and atmospheric while remaining fully playable
     }
   }
 
-  document.querySelectorAll('.card').forEach(card => {
-    const id = card.dataset.counter;
-    const el = card.querySelector('.plays-count');
-    if (!id || !el) return;
-    fetch(API + id)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        const v = Number(d.value) || 0;
-        el.textContent = fmt(v);
-        total += v; anyOk = true;
-        showTotal();
+  function apply(key, value){
+    if (!elFor.has(key)) return;
+    if (key in values) total -= values[key];
+    values[key] = value;
+    total += value; anyOk = true;
+    elFor.get(key).textContent = fmt(value);
+    showTotal();
+  }
+
+  /* last known values paint instantly; the api only refreshes them */
+  function readCache(){
+    try {
+      const raw = JSON.parse(localStorage.getItem(CACHE) || 'null');
+      if (!raw || !raw.values) return 0;
+      cards.forEach(({ key }) => {
+        if (typeof raw.values[key] === 'number') apply(key, raw.values[key]);
+      });
+      return Number(raw.t) || 0;
+    } catch { return 0; }
+  }
+
+  function writeCache(){
+    try { localStorage.setItem(CACHE, JSON.stringify({ t: Date.now(), values })); } catch {}
+  }
+
+  /* documented as milliseconds, but stay tolerant of seconds */
+  function waitFor(value){
+    const raw = Number(value);
+    if (!Number.isFinite(raw) || raw <= 0) return 2000;
+    return raw < 100 ? raw * 1000 : raw;
+  }
+
+  function retryable(err, key, attempt, run){
+    if (err && err.wait && attempt < 3)
+      return new Promise(res => setTimeout(res, err.wait)).then(() => run(key, attempt + 1));
+  }
+
+  function read(key, attempt){
+    return fetch(GET + key)
+      .then(r => {
+        if (r.status === 404) return { value: 0 };   // key exists, never played
+        if (r.status === 429) throw Object.assign(new Error('rate limited'), { wait: waitFor(r.headers.get('Retry-After')) });
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
       })
-      .catch(() => { el.textContent = '—'; });
-  });
+      .then(d => apply(key, Number(d.value) || 0))
+      .catch(err => retryable(err, key, attempt, read));
+  }
+
+  function hit(key, attempt){
+    return fetch(HIT + key)                          // GET — /hit redirects a POST
+      .then(r => {
+        if (r.status === 429) throw Object.assign(new Error('rate limited'), { wait: waitFor(r.headers.get('Retry-After')) });
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+      })
+      .then(d => { apply(key, Number(d.value) || 0); writeCache(); })
+      .catch(err => retryable(err, key, attempt, hit));
+  }
+
+  const cachedAt = readCache();
+  if (Date.now() - cachedAt > TTL){
+    let i = 0;
+    (function next(){
+      if (i >= cards.length){ writeCache(); return; }
+      read(cards[i++].key, 0).then(() => setTimeout(next, PACE));
+    })();
+  }
 
   window.incrementPlay = function(card){
-    const id = card.dataset.counter;
-    const el = card.querySelector('.plays-count');
-    if (!id || !el) return;
-    fetch(API + id, { method: 'POST' })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        el.textContent = fmt(Number(d.value) || 0);
-        total += 1;
-        showTotal();
-      })
-      .catch(() => {});
+    const key = card.dataset.counter;
+    if (key) hit(key, 0);
   };
 })();
 

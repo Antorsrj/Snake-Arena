@@ -1,0 +1,5 @@
+# abacus admin keys — private, never commit
+counters.admin.json
+
+# python
+__pycache__/
