@@ -84,6 +84,12 @@ def size_kb(path: Path) -> int:
     return path.stat().st_size // 1024
 
 
+def display_date(value: str) -> str:
+    """'2026-10-17' -> '17-10-2026' (dd-mm-yyyy)."""
+    match = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", value or "")
+    return f"{match.group(3)}-{match.group(2)}-{match.group(1)}" if match else value
+
+
 def parsed_cards(text: str):
     """Read the card blocks currently in index.html (used by --seed)."""
     entries = []
@@ -134,6 +140,8 @@ def render_card(entry: dict, index: int, title: str) -> str:
         f'    <div class="card-meta"><span>size <b>{size_kb(ROOT / entry["file"])} KB</b></span>'
         f'<span>self-contained</span><span>plays <b class="plays-count">—</b></span></div>'
     )
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry.get("added") or ""):
+        lines.append(f'    <div class="card-added">added <b>{display_date(entry["added"])}</b></div>')
     lines.append('    <button class="play-btn" tabindex="-1">▶ Play</button>')
     lines.append('  </article>')
     return "\n".join(lines)
