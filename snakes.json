@@ -2,201 +2,239 @@
   {
     "file": "Beam_snake.html",
     "model": "Beam",
-    "counter": "beam"
+    "counter": "beam",
+    "added": "2026-10-17"
   },
   {
     "file": "ChatGPT_Free_web_snake.html",
     "model": "ChatGPT Free Web",
-    "counter": "chatgpt-free-web"
+    "counter": "chatgpt-free-web",
+    "added": "2026-10-06"
   },
   {
     "file": "Copilot_Free_web_Snake.html",
     "model": "Copilot Free Web",
-    "counter": "copilot-free-web"
+    "counter": "copilot-free-web",
+    "added": "2026-10-06"
   },
   {
     "file": "Cat_Jam_Free_snake.html",
     "model": "Cat Jam Free",
     "counter": "cat-jam-free",
+    "added": "2026-10-15",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "Cursor_Auto_snake.html",
     "model": "Cursor Auto",
-    "counter": "cursor-auto"
+    "counter": "cursor-auto",
+    "added": "2026-10-01"
   },
   {
     "file": "Dots3-Note_snake.html",
     "model": "Dots3 Note",
     "counter": "dots3-note",
+    "added": "2026-10-15",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "DeepSeek_V4.1_flash_snake.html",
     "model": "DeepSeek V4.1 Flash",
-    "counter": "deepseek-v4-1-flash"
+    "counter": "deepseek-v4-1-flash",
+    "added": "2026-10-15"
   },
   {
     "file": "Fable5.1_snake.html",
     "model": "Fable 5.1",
-    "counter": "fable-5-1"
+    "counter": "fable-5-1",
+    "added": "2026-10-17"
   },
   {
     "file": "Gemini_Free_Web_snake.html",
     "model": "Gemini Free Web",
-    "counter": "gemini-free-web"
+    "counter": "gemini-free-web",
+    "added": "2026-10-06"
   },
   {
     "file": "Gemma4_12B_Snake.html",
     "model": "Gemma 4 12B",
-    "counter": "gemma-4-12b"
+    "counter": "gemma-4-12b",
+    "added": "2026-10-01"
   },
   {
     "file": "gemma-4-26B-A4B_snake.html",
     "model": "Gemma 4 26B A4B",
-    "counter": "gemma-4-26b-a4b"
+    "counter": "gemma-4-26b-a4b",
+    "added": "2026-10-06"
   },
   {
     "file": "GLM5.3_Flash_snake.html",
     "model": "GLM 5.3 Flash",
-    "counter": "glm-5-3-flash"
+    "counter": "glm-5-3-flash",
+    "added": "2026-10-17"
   },
   {
     "file": "GPT6.1_SOL_snake.html",
     "model": "GPT 6.1 SOL",
-    "counter": "gpt-6-1-sol"
+    "counter": "gpt-6-1-sol",
+    "added": "2026-10-06"
   },
   {
     "file": "GPT_Astra_6_Snake.html",
     "model": "GPT Astra 6",
-    "counter": "gpt-astra-6"
+    "counter": "gpt-astra-6",
+    "added": "2026-10-06"
   },
   {
     "file": "Grok4.6_Snake.html",
     "model": "Grok 4.6",
-    "counter": "grok-4-6"
+    "counter": "grok-4-6",
+    "added": "2026-10-06"
   },
   {
     "file": "Grok4.7_Snake.html",
     "model": "Grok 4.7",
-    "counter": "grok-4-7"
+    "counter": "grok-4-7",
+    "added": "2026-10-06"
   },
   {
     "file": "Grok_Free_Web_Snake.html",
     "model": "Grok Free Web",
-    "counter": "grok-free-web"
+    "counter": "grok-free-web",
+    "added": "2026-10-06"
   },
   {
     "file": "Inkling_snake.html",
     "model": "Inkling",
-    "counter": "inkling"
+    "counter": "inkling",
+    "added": "2026-10-17"
   },
   {
     "file": "LagunaS21_snake-game.html",
     "model": "Laguna S21",
     "counter": "laguna-s21",
+    "added": "2026-10-01",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "LFM2.5-24B-A2B_snake.html",
     "model": "LFM 2.5 24B A2B",
     "counter": "lfm-2-5-24b-a2b",
+    "added": "2026-10-15",
     "title": "NEON SNAKE",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "LongCat2.5_snake.html",
     "model": "LongCat 2.5",
-    "counter": "longcat-2-5"
+    "counter": "longcat-2-5",
+    "added": "2026-10-15"
   },
   {
     "file": "MiMo-V2.6_snake.html",
     "model": "MiMo-V2.6",
-    "counter": "mimo-v2-6"
+    "counter": "mimo-v2-6",
+    "added": "2026-10-17"
   },
   {
     "file": "Mistral_Free_Web_snake.html",
     "model": "Mistral Free Web",
-    "counter": "mistral-free-web"
+    "counter": "mistral-free-web",
+    "added": "2026-10-06"
   },
   {
     "file": "MiniCPM-V4.7-35B_snake_cyberpunk.html",
     "model": "MiniCPM V4.7 35B",
-    "counter": "minicpm-v4-7-35b"
+    "counter": "minicpm-v4-7-35b",
+    "added": "2026-10-15"
   },
   {
     "file": "MuseGlimmer_index.html",
     "model": "Muse Glimmer",
     "counter": "muse-glimmer",
+    "added": "2026-10-01",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "MuseSpark1.3_snake.html",
     "model": "Muse Spark 1.3",
-    "counter": "muse-spark-1-3"
+    "counter": "muse-spark-1-3",
+    "added": "2026-10-01"
   },
   {
     "file": "Nemotron3_snake.html",
     "model": "Nemotron 3",
-    "counter": "nemotron-3"
+    "counter": "nemotron-3",
+    "added": "2026-10-01"
   },
   {
     "file": "Nemotron_3_Nano_Omni_30B_snake.html",
     "model": "Nemotron 3 Nano Omni 30B",
-    "counter": "nemotron-3-nano-omni-30b"
+    "counter": "nemotron-3-nano-omni-30b",
+    "added": "2026-10-17"
   },
   {
     "file": "Nemotron3.5-Bolt_snake.html",
     "model": "Nemotron 3.5 Bolt",
-    "counter": "nemotron-3-5-bolt"
+    "counter": "nemotron-3-5-bolt",
+    "added": "2026-10-15"
   },
   {
     "file": "Nemotron3.5_Super_VL_Free_snake.html",
     "model": "Nemotron 3.5 Super VL Free",
-    "counter": "nemotron-3-5-super-vl-free"
+    "counter": "nemotron-3-5-super-vl-free",
+    "added": "2026-10-15"
   },
   {
     "file": "Opus5.5_Snake.html",
     "model": "Opus 5.5",
-    "counter": "opus-5-5"
+    "counter": "opus-5-5",
+    "added": "2026-10-01"
   },
   {
     "file": "Ornith1.0_snake.html",
     "model": "Ornith 1.0",
     "counter": "ornith-1-0",
+    "added": "2026-10-06",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "Ornith1.5_Snake.html",
     "model": "Ornith 1.5",
-    "counter": "ornith-1-5"
+    "counter": "ornith-1-5",
+    "added": "2026-10-17"
   },
   {
     "file": "Perplexity_Free_Web_Snake.html",
     "model": "Perplexity Free Web",
     "counter": "perplexity-free-web",
+    "added": "2026-10-06",
     "warn": "did not work after 1 prompt iteration"
   },
   {
     "file": "Qwen3.8NextFlash_neurosnake.html",
     "model": "Qwen 3.8 Next Flash",
-    "counter": "qwen-3-8-next-flash"
+    "counter": "qwen-3-8-next-flash",
+    "added": "2026-10-01"
   },
   {
     "file": "Qwen3.8-35B-A3B_snake.html",
     "model": "Qwen 3.8-35B A3B",
     "counter": "qwen-3-8-35b-a3b",
+    "added": "2026-10-15",
     "title": "CYBER_SNAKE // QWEN 3.8 35B"
   },
   {
     "file": "Qwen3.8-27B_cyber-snake.html",
     "model": "Qwen 3.8-27B",
-    "counter": "qwen-3-8-27b"
+    "counter": "qwen-3-8-27b",
+    "added": "2026-10-01"
   },
   {
     "file": "TernaryBonsai_snake-game.html",
     "model": "Ternary Bonsai",
     "counter": "ternary-bonsai",
+    "added": "2026-10-06",
     "warn": "did not work after 1 prompt iteration"
   }
 ]

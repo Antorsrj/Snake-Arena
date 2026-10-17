@@ -4,7 +4,10 @@
 Regenerates the contestant card grid and the model counts in index.html from
 snakes.json. Each card's *title* is read from the game file's own <title> and
 its *size* is read from disk, so neither can drift. Only curated facts (display
-name, counter slug, warning, title override) live in the manifest.
+name, counter slug, added date, warning, title override) live in the manifest.
+
+Cards are ordered newest-first by their "added" date, alphabetical within a
+batch; the latest additions therefore sit at the top of the page.
 
 Usage:
     python3 build.py            # regenerate index.html from snakes.json
@@ -114,9 +117,10 @@ def render_card(entry: dict, index: int, title: str) -> str:
     attr_title = html_mod.escape(title, quote=True)
     attr_model = html_mod.escape(entry["model"], quote=True)
     counter = html_mod.escape(entry["counter"], quote=True)
+    added = f' data-added="{html_mod.escape(entry["added"], quote=True)}"' if entry.get("added") else ""
     lines = [
         f'<article class="card" tabindex="0" role="button" data-game="{game}" '
-        f'data-title="{attr_title}" data-model="{attr_model}" data-counter="{counter}">',
+        f'data-title="{attr_title}" data-model="{attr_model}" data-counter="{counter}"{added}>',
         f'    <div class="card-index">{index:02d}</div>',
         f'    <div class="card-model">{html_mod.escape(entry["model"])}</div>',
         f'    <div class="card-title">{html_mod.escape(title)}</div>',
@@ -154,6 +158,8 @@ def validate(entries: list[dict]) -> tuple[list[str], list[str]]:
                 f"({seen_counters[entry['counter']]} and {entry['model']}) — would double-count"
             )
         seen_counters[entry["counter"]] = entry["model"]
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry.get("added") or ""):
+            warnings.append(f"{entry['model']}: no valid \"added\" date — it will sort last")
         if resolve_title(entry) is None:
             errors.append(f"no <title> found in {entry['file']} (set a \"title\" override)")
 
@@ -164,7 +170,9 @@ def validate(entries: list[dict]) -> tuple[list[str], list[str]]:
 
 
 def build_document(text: str, entries: list[dict]):
+    # newest first, alphabetical within a batch (the second sort is stable)
     ordered = sorted(entries, key=lambda e: natural_key(e["model"]))
+    ordered = sorted(ordered, key=lambda e: e.get("added") or "", reverse=True)
     count = len(ordered)
 
     cards = "\n\n".join(
