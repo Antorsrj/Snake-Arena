@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#01060a" />
+<title>SNAKE.EXE // Matrix Protocol</title>
+
+<style>
+/* =========================================================================
+   SNAKE.EXE — Cyberpunk / Matrix themed Snake
+   Pure HTML + CSS + JS. No external libraries, fonts or assets.
+   ========================================================================= */
+
+:root{
+  --green:      #39ff88;   /* primary neon green          */
+  --green-hot:  #b6ffd9;   /* bright core green           */
+  --cyan:       #00f0ff;   /* accent cyan                 */
+  --magenta:    #ff2bd6;   /* accent magenta              */
+  --bg:         #01060a;   /* deep terminal black         */
+  --panel:      rgba(0, 18, 13, .78);
+  --line:       rgba(57, 255, 136, .28);
+  --board-size: min(56vh, 600px, 88vw);
+  --font: "Lucida Console", "Courier New", ui-monospace, Menlo, Consolas, monospace;
+}
+
+*{ box-sizing: border-box; }
+
+html, body{
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body{
+  font-family: var(--font);
+  color: var(--green);
+  overflow-x: hidden;
+  /* subtle animated CRT flicker over the whole page */
+  animation: crtFlicker 6s infinite steps(1);
+}
+
+/* ------------------------- background layers ---------------------------- */
+
+/* Digital rain canvas (Matrix falling code) */
+#rain{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  opacity: .85;
+  pointer-events: none;
+}
+
+/* Horizontal CRT scanlines */
+.scanlines{
+  position: fixed;
+  inset: -10px 0;
+  z-index: 40;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0)    0 2px,
+    rgba(0,0,0,.35)  2px 4px
+  );
+  animation: scanDrift 9s linear infinite;
+}
+
+/* Slow sweeping scan bar */
+.sweep{
+  position: fixed;
+  left: 0; right: 0;
+  height: 180px;
+  z-index: 41;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,255,136,0)       0%,
+    rgba(0,255,136,.045)   50%,
+    rgba(0,255,136,0)     100%
+  );
+  animation: sweepMove 7.5s linear infinite;
+}
+
+/* CRT vignette (dark corners) */
+.vignette{
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,0) 45%,
+    rgba(0,0,0,.55) 88%,
+    rgba(0,0,0,.85) 100%);
+}
+
+/* RGB-split glitch flash layer, toggled by JS */
+#glitchFlash{
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(to bottom,
+      rgba(255,43,214,.20) 0 2px,
+      transparent           2px 7px,
+      rgba(0,240,255,.16)  7px 9px,
+      transparent           9px 26px);
+}
+body.glitch #glitchFlash{ animation: glitchFlash .28s steps(2) 1; }
+body.glitch #app{        animation: glitchShift .28s steps(2) 1; }
+
+/* ------------------------------- layout -------------------------------- */
+
+#app{
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 22px;
+}
+
+/* --- top command bar --- */
+.bar{
+  width: min(1100px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(90deg, rgba(0,40,26,.55), rgba(0,10,20,.35));
+  box-shadow: 0 0 18px rgba(57,255,136,.10) inset, 0 0 12px rgba(0,240,255,.08);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+.brand{ display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+
+.brand .glyph{
+  color: var(--magenta);
+  text-shadow: 0 0 8px var(--magenta);
+  animation: blink 1.4s steps(1) infinite;
+}
+
+h1{
+  position: relative;
+  margin: 0;
+  font-size: clamp(16px, 2.4vw, 24px);
+  letter-spacing: .32em;
+  font-weight: 700;
+  color: var(--green);
+  text-shadow: 0 0 6px rgba(57,255,136,.9), 0 0 22px rgba(57,255,136,.45);
+}
+/* chromatic aberration clones of the title */
+h1::before, h1::after{
+  content: attr(data-text);
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  pointer-events: none;
+}
+h1::before{ color: var(--magenta); animation: glitchA 3.4s infinite steps(1); }
+h1::after { color: var(--cyan);    animation: glitchB 2.9s infinite steps(1); }
+
+.brand .sub{
+  font-size: 11px;
+  letter-spacing: .18em;
+  color: rgba(0,240,255,.75);
+  white-space: nowrap;
+}
+
+.sys{
+  font-size: 11px;
+  letter-spacing: .16em;
+  color: rgba(182,255,217,.7);
+  white-space: nowrap;
+}
+.sys .ok{ color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.sys .dot{
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+/* --- stats row --- */
+.stats{
+  width: min(1100px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stat{
+  flex: 1 1 150px;
+  padding: 7px 12px 9px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  position: relative;
+  overflow: hidden;
+}
+.stat::after{ /* corner tick */
+  content: "";
+  position: absolute;
+  right: 0; top: 0;
+  border: 8px solid transparent;
+  border-top-color: var(--cyan);
+  border-right-color: var(--cyan);
+  opacity: .55;
+}
+.stat label{
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: .28em;
+  color: rgba(0,240,255,.72);
+  margin-bottom: 3px;
+}
+.stat b{
+  font-size: clamp(18px, 2.6vw, 26px);
+  letter-spacing: .14em;
+  font-weight: 700;
+  color: var(--green-hot);
+  text-shadow: 0 0 10px rgba(57,255,136,.8);
+  font-variant-numeric: tabular-nums;
+}
+.stat.hi b{ color: var(--magenta); text-shadow: 0 0 10px rgba(255,43,214,.75); }
+
+.stat.wide{ flex: 2 1 260px; }
+.meter{
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+.meter i{
+  flex: 1;
+  height: 12px;
+  background: rgba(57,255,136,.10);
+  border: 1px solid rgba(57,255,136,.22);
+  transition: background .18s, box-shadow .18s;
+}
+.meter i.on{
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(57,255,136,.85);
+  border-color: var(--green);
+}
+.meter i.on.hot{
+  background: var(--magenta);
+  box-shadow: 0 0 9px rgba(255,43,214,.9);
+  border-color: var(--magenta);
+}
+.spd{
+  float: right;
+  font-size: 10px;
+  letter-spacing: .16em;
+  color: rgba(182,255,217,.7);
+}
+
+/* --- game board --- */
+.stage{ display: flex; justify-content: center; }
+
+.board{
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  border: 1px solid rgba(57,255,136,.55);
+  background: rgba(0, 12, 9, .92);
+  box-shadow:
+    0 0 24px rgba(57,255,136,.20),
+    0 0 90px rgba(0,240,255,.10),
+    inset 0 0 42px rgba(0,255,136,.10);
+}
+#game{
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.board.dying{ animation: deathShake .45s linear 1; }
+
+/* HUD corner brackets */
+.corner{
+  position: absolute;
+  width: 20px; height: 20px;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 8px rgba(0,240,255,.7);
+  pointer-events: none;
+  z-index: 3;
+}
+.corner.tl{ top: -3px; left: -3px;   border-right: 0; border-bottom: 0; }
+.corner.tr{ top: -3px; right: -3px;  border-left: 0;  border-bottom: 0; }
+.corner.bl{ bottom: -3px; left: -3px; border-right: 0; border-top: 0; }
+.corner.br{ bottom: -3px; right: -3px; border-left: 0;  border-top: 0; }
+
+/* --- overlays (menu / pause / game over) --- */
+.overlay{
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 8, 6, .82);
+  backdrop-filter: blur(3px) saturate(140%);
+  -webkit-backdrop-filter: blur(3px) saturate(140%);
+  animation: overlayIn .25s ease-out;
+}
+.overlay.hidden{ display: none; }
+
+.panel{
+  width: min(84%, 420px);
+  padding: 22px 24px;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(0,32,22,.85), rgba(0,10,16,.9));
+  box-shadow: 0 0 30px rgba(57,255,136,.18), inset 0 0 30px rgba(0,240,255,.07);
+  position: relative;
+  clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+}
+.panel h2{
+  position: relative;
+  margin: 0 0 12px;
+  font-size: clamp(15px, 2.2vw, 21px);
+  letter-spacing: .2em;
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(0,240,255,.8);
+}
+.panel h2.danger{
+  color: var(--magenta);
+  text-shadow: 0 0 12px rgba(255,43,214,.85);
+}
+.panel h2::before, .panel h2::after{
+  content: attr(data-text);
+  position: absolute;
+  left: 0; top: 0; width: 100%;
+}
+.panel h2::before{ color: var(--magenta); animation: glitchA 2.6s infinite steps(1); opacity:.75; }
+.panel h2::after { color: var(--green);    animation: glitchB 3.1s infinite steps(1); opacity:.7; }
+
+.panel p{
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  letter-spacing: .1em;
+  color: rgba(182,255,217,.85);
+}
+.panel .score-line{
+  margin: 14px 0 4px;
+  font-size: 13px;
+  letter-spacing: .16em;
+  color: rgba(0,240,255,.85);
+}
+.panel .score-line b{
+  display: inline-block;
+  font-size: 22px;
+  color: var(--green-hot);
+  text-shadow: 0 0 10px rgba(57,255,136,.8);
+  margin: 0 6px;
+}
+.panel .score-line b.mag{
+  color: var(--magenta);
+  text-shadow: 0 0 10px rgba(255,43,214,.8);
+}
+.panel .prompt{
+  margin-top: 16px;
+  font-size: 12px;
+  letter-spacing: .2em;
+  color: var(--green);
+  animation: blink 1.2s steps(1) infinite;
+}
+
+/* --- legend / footer --- */
+.legend{
+  width: min(1100px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  justify-content: center;
+  padding: 8px 12px;
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  color: rgba(182,255,217,.68);
+  border-top: 1px solid rgba(57,255,136,.16);
+  border-bottom: 1px solid rgba(57,255,136,.16);
+  background: rgba(0,14,10,.45);
+}
+.legend span{ display: inline-flex; align-items: center; gap: 6px; }
+kbd{
+  display: inline-block;
+  min-width: 20px;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: 10px;
+  text-align: center;
+  color: var(--cyan);
+  border: 1px solid rgba(0,240,255,.5);
+  background: rgba(0,240,255,.08);
+  box-shadow: 0 2px 0 rgba(0,240,255,.35);
+}
+
+.statusline{
+  width: min(1100px, 100%);
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: rgba(57,255,136,.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.statusline .path{ color: var(--magenta); }
+.cursor{
+  display: inline-block;
+  color: var(--green-hot);
+  animation: blink .9s steps(1) infinite;
+}
+
+/* ------------------------------ animations ----------------------------- */
+
+@keyframes blink{ 0%,55%{opacity:1} 56%,100%{opacity:.15} }
+
+@keyframes crtFlicker{
+  0%, 100%{ filter: none; }
+  92%     { filter: none; }
+  93%     { filter: brightness(1.18) contrast(1.05); }
+  94%     { filter: none; }
+  97%     { filter: brightness(.93); }
+  98%     { filter: none; }
+}
+
+@keyframes scanDrift{ from{ transform: translateY(0); } to{ transform: translateY(8px); } }
+
+@keyframes sweepMove{
+  0%  { transform: translateY(-200px); opacity: 0; }
+  8%  { opacity: 1; }
+  92% { opacity: 1; }
+  100%{ transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes glitchFlash{
+  0%  { opacity: .0; transform: translateX(0); }
+  25% { opacity: .55; transform: translateX(-6px); }
+  50% { opacity: .18; transform: translateX(5px); }
+  75% { opacity: .45; transform: translateX(-3px); }
+  100%{ opacity: 0; transform: translateX(0); }
+}
+
+@keyframes glitchShift{
+  0%  { transform: translate(0,0) skewX(0deg); }
+  25% { transform: translate(-4px,1px) skewX(.6deg); }
+  50% { transform: translate(4px,-1px) skewX(-.5deg); }
+  75% { transform: translate(-2px,0) skewX(.3deg); }
+  100%{ transform: translate(0,0) skewX(0deg); }
+}
+
+@keyframes glitchA{
+  0%, 90%, 100%{ clip-path: inset(0 0 100% 0); transform: translate(0,0); }
+  91%{ clip-path: inset(0 0 62% 0);  transform: translate(-3px,-1px); }
+  94%{ clip-path: inset(46% 0 33% 0); transform: translate(3px,1px); }
+  97%{ clip-path: inset(74% 0 4% 0);  transform: translate(-2px,0); }
+}
+@keyframes glitchB{
+  0%, 87%, 100%{ clip-path: inset(0 0 100% 0); transform: translate(0,0); }
+  88%{ clip-path: inset(20% 0 55% 0); transform: translate(3px,1px); }
+  92%{ clip-path: inset(62% 0 18% 0); transform: translate(-3px,-1px); }
+  96%{ clip-path: inset(5% 0 80% 0);  transform: translate(2px,0); }
+}
+
+@keyframes overlayIn{
+  from{ opacity: 0; transform: scale(.985); }
+  to  { opacity: 1; transform: scale(1); }
+}
+
+@keyframes deathShake{
+  0%  { transform: translate(0,0); }
+  15% { transform: translate(-7px,3px); }
+  30% { transform: translate(6px,-4px); }
+  45% { transform: translate(-5px,-2px); }
+  60% { transform: translate(4px,3px); }
+  75% { transform: translate(-3px,1px); }
+  100%{ transform: translate(0,0); }
+}
+
+@keyframes titlePulse{
+  0%,100%{ text-shadow: 0 0 6px rgba(57,255,136,.9), 0 0 22px rgba(57,255,136,.45); }
+  50%    { text-shadow: 0 0 10px rgba(57,255,136,1), 0 0 34px rgba(0,240,255,.55); }
+}
+h1{ animation: titlePulse 3s ease-in-out infinite; }
+
+/* ------------------------------ responsive ----------------------------- */
+
+@media (max-width: 720px){
+  :root{ --board-size: min(62vh, 92vw); }
+  .brand .sub{ display: none; }
+  .sys{ display: none; }
+  .stat{ flex: 1 1 45%; }
+  .stat.wide{ flex: 1 1 100%; }
+  #app{ gap: 9px; padding: 10px 10px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .sweep, body{ animation: none; }
+  h1::before, h1::after, .panel h2::before, .panel h2::after{ animation: none; opacity: .35; }
+  .board.dying{ animation: none; }
+}
+</style>
+</head>
+
+<body>
+<!-- ===================== BACKGROUND / OVERLAY LAYERS ===================== -->
+<canvas id="rain"></canvas>      <!-- Matrix digital rain                  -->
+<div class="scanlines"></div>     <!-- CRT scanlines                        -->
+<div class="sweep"></div>         <!-- sweeping scan bar                    -->
+<div class="vignette"></div>      <!-- CRT vignette                         -->
+<div id="glitchFlash"></div>      <!-- RGB split glitch burst (JS toggled)  -->
+
+<!-- ================================ APP ================================= -->
+<div id="app">
+
+  <!-- Command bar -->
+  <header class="bar">
+    <div class="brand">
+      <span class="glyph">&#9618;</span>
+      <h1 data-text="SNAKE.EXE">SNAKE.EXE</h1>
+      <span class="sub">// NETRUNNER&nbsp;PROTOCOL&nbsp;v2.6</span>
+    </div>
+    <div class="sys">UPLINK:&nbsp;<b class="ok">ONLINE</b><span class="dot"></span></div>
+  </header>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="stat"><label>SCORE</label><b id="score">000000</b></div>
+    <div class="stat hi"><label>HIGH SCORE</label><b id="high">000000</b></div>
+    <div class="stat"><label>LEVEL</label><b id="level">01</b></div>
+    <div class="stat wide">
+      <label>THROUGHPUT <span class="spd" id="spd">145ms / cell</span></label>
+      <div class="meter" id="meter"></div>
+    </div>
+  </section>
+
+  <!-- Board -->
+  <main class="stage">
+    <div class="board" id="board">
+      <canvas id="game"></canvas>
+      <i class="corner tl"></i><i class="corner tr"></i>
+      <i class="corner bl"></i><i class="corner br"></i>
+
+      <div class="overlay" id="overlay">
+        <div class="panel">
+          <h2 id="ovTitle" data-text="JACK IN">JACK IN</h2>
+          <div id="ovBody"></div>
+          <div class="prompt" id="ovPrompt">PRESS [ENTER] TO START</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Controls legend -->
+  <footer class="legend">
+    <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>&uarr;</kbd><kbd>&larr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> MOVE</span>
+    <span><kbd>SPACE</kbd> PAUSE</span>
+    <span><kbd>R</kbd> REBOOT</span>
+    <span><kbd>M</kbd> AUDIO</span>
+  </footer>
+
+  <!-- Status line -->
+  <div class="statusline"><span class="path">root@matrix:~/grid$</span> <span id="status">awaiting neural link...</span><span class="cursor">&#9608;</span></div>
+</div>
+
+<script>
+/* =========================================================================
+   SNAKE.EXE — game engine
+   Sections: config → state → audio → digital rain → HUD → game logic →
+             rendering → input → main loop
+   ========================================================================= */
+(function () {
+  'use strict';
+
+  /* ----------------------------- CONFIG -------------------------------- */
+  const GRID          = 21;      // board is GRID x GRID cells
+  const START_LEN     = 3;       // snake length at start
+  const BASE_TICK     = 145;     // ms per step at level 1
+  const TICK_DECAY    = 8;       // ms faster per level
+  const MIN_TICK      = 58;      // fastest possible step
+  const FOODS_PER_LVL = 4;       // data nodes eaten per level up
+  const MAX_LEVEL     = 16;      // speed meter scale
+  const HS_KEY        = 'cybersnake.highscore.v1';
+
+  const COL = {
+    green:    '#39ff88',
+    greenHot: '#b6ffd9',
+    cyan:     '#00f0ff',
+    magenta:  '#ff2bd6'
+  };
+
+  /* ------------------------------ DOM ---------------------------------- */
+  const $ = (id) => document.getElementById(id);
+  const rainCanvas = $('rain'),   rainCtx = rainCanvas.getContext('2d');
+  const gameCanvas = $('game'),   g       = gameCanvas.getContext('2d');
+  const boardEl = $('board');
+  const overlay = $('overlay'), ovTitle = $('ovTitle'),
+        ovBody  = $('ovBody'),  ovPrompt = $('ovPrompt');
+  const elScore = $('score'), elHigh = $('high'), elLevel = $('level'),
+        elSpd = $('spd'), elMeter = $('meter'), elStatus = $('status');
+
+  /* --------------------------- GAME STATE ------------------------------ */
+  let state = 'menu';            // 'menu' | 'playing' | 'paused' | 'over'
+  let snake = [];                // head first: [{x,y}, ...]
+  let prevTail = null;           // cell the tail occupied last tick
+  let dir = { x: 1, y: 0 };      // current travel direction
+  let dirQueue = [];             // buffered inputs (max 3)
+  let food = null;               // {x,y}
+  let score = 0, level = 1, foodsEaten = 0, tickMs = BASE_TICK;
+  let high = loadHigh();
+
+  let acc = 0, lastTs = 0;       // fixed-timestep accumulator
+  let alpha = 0;                 // interpolation factor within a tick (0..1)
+  let hasStepped = false;        // false until the first simulation step
+  let viewW = 0, cell = 0, dpr = 1;
+
+  // FX pools
+  let particles = [];            // sparks
+  let waves    = [];             // expanding shockwave rings
+  let floats   = [];             // floating score text
+  let shake = 0, flash = 0;
+
+  /* --------------------------- PERSISTENCE ----------------------------- */
+  function loadHigh() {
+    try { return parseInt(localStorage.getItem(HS_KEY) || '0', 10) || 0; }
+    catch (e) { return 0; }                                  // private mode
+  }
+  function saveHigh(v) {
+    try { localStorage.setItem(HS_KEY, String(v)); } catch (e) {}
+  }
+
+  /* ------------------------------ AUDIO -------------------------------- */
+  /* Tiny synthesised bleeps — no audio files required. */
+  let actx = null, muted = false;
+  function audio() {
+    if (muted) return null;
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  function beep(f0, f1, dur, type, vol) {
+    const ac = audio(); if (!ac) return;
+    const o = ac.createOscillator(), gn = ac.createGain();
+    const t = ac.currentTime;
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(vol || 0.05, t + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn).connect(ac.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const sEat   = () => beep(720, 1250, 0.10, 'square', 0.05);
+  const sLevel = () => { beep(660, 990, 0.09, 'square', 0.05);
+                         setTimeout(() => beep(990, 1480, 0.12, 'square', 0.05), 90); };
+  const sDie   = () => beep(320, 45, 0.65, 'sawtooth', 0.09);
+  const sStart = () => beep(180, 760, 0.22, 'triangle', 0.06);
+
+  /* =======================================================================
+     DIGITAL RAIN (background canvas)
+     ======================================================================= */
+  const RAIN_FS = 15;                                   // font size (px)
+  const GLYPHS = ('アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワ'
+                + '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                + '<>{}[]/*+=$#%&').split('');
+  let rainCols = [], rw = 0, rh = 0;
+
+  const glyph = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
+
+  function rainResize() {
+    rw = window.innerWidth;
+    rh = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    rainCanvas.width  = Math.round(rw * dpr);
+    rainCanvas.height = Math.round(rh * dpr);
+    rainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rainCtx.fillStyle = '#01060a';
+    rainCtx.fillRect(0, 0, rw, rh);
+
+    const cols = Math.ceil(rw / RAIN_FS);
+    rainCols = [];
+    for (let i = 0; i < cols; i++) {
+      rainCols.push({
+        y: -Math.random() * rh,      // vertical offset of the head
+        v: 1.4 + Math.random() * 3.2 // fall speed (px/frame @60fps)
+      });
+    }
+  }
+
+  function rainDraw(dt) {
+    const k = dt / 16.67;                       // normalise to 60fps frames
+
+    // translucent black veil → creates the fading trail
+    rainCtx.fillStyle = 'rgba(1, 6, 4, 0.085)';
+    rainCtx.fillRect(0, 0, rw, rh);
+
+    rainCtx.font = '600 ' + RAIN_FS + 'px "Lucida Console", "Courier New", monospace';
+    rainCtx.textBaseline = 'top';
+
+    for (let i = 0; i < rainCols.length; i++) {
+      const col = rainCols[i];
+      col.y += col.v * k;
+
+      // occasional colour accent per column
+      const accent = (i % 17 === 0) ? '255,43,214' : (i % 11 === 0 ? '0,240,255' : '0,255,136');
+
+      // head glyph — bright white-green
+      rainCtx.fillStyle = 'rgba(214, 255, 232, .95)';
+      rainCtx.fillText(glyph(), i * RAIN_FS, col.y);
+
+      // a short "code stream" trail behind the head
+      for (let t = 1; t <= 3; t++) {
+        const ty = col.y - t * RAIN_FS;
+        if (ty < -RAIN_FS) break;
+        rainCtx.fillStyle = 'rgba(' + accent + ',' + (0.5 / t) + ')';
+        rainCtx.fillText(glyph(), i * RAIN_FS, ty);
+      }
+
+      if (col.y > rh + RAIN_FS) {
+        col.y = -Math.random() * rh * 0.6;
+        col.v = 1.4 + Math.random() * 3.2;
+      }
+    }
+  }
+
+  /* ============================ HUD / UI ================================ */
+  const METER_BLOCKS = 12;
+  (function buildMeter() {
+    for (let i = 0; i < METER_BLOCKS; i++) {
+      const b = document.createElement('i');
+      if (i >= METER_BLOCKS - 4) b.className = 'hot';
+      elMeter.appendChild(b);
+    }
+  })();
+
+  const pad = (n) => String(Math.max(0, n)).padStart(6, '0');
+
+  function updateHUD() {
+    elScore.textContent = pad(score);
+    elHigh.textContent  = pad(Math.max(high, score));
+    elLevel.textContent = String(level).padStart(2, '0');
+    elSpd.textContent   = tickMs + 'ms / cell';
+
+    const filled = Math.min(METER_BLOCKS, Math.ceil(level / MAX_LEVEL * METER_BLOCKS));
+    const blocks = elMeter.children;
+    for (let i = 0; i < blocks.length; i++) blocks[i].classList.toggle('on', i < filled);
+  }
+
+  let statusTimer = 0;
+  const STATUS = [
+    'grid integrity nominal...',
+    'scanning for data nodes...',
+    'firewall threads active...',
+    'packet loss: 0.00%',
+    'rendering neon lattice...',
+    'root access granted.'
+  ];
+  function setStatus(msg) {
+    elStatus.textContent = msg;
+    statusTimer = 0;
+  }
+
+  /* --------------------------- overlay screens -------------------------- */
+  function showOverlay(kind) {
+    overlay.classList.remove('hidden');
+    if (kind === 'menu') {
+      ovTitle.textContent = 'JACK IN';
+      ovTitle.setAttribute('data-text', 'JACK IN');
+      ovTitle.classList.remove('danger');
+      ovBody.innerHTML =
+        '<p>Guide the construct through the grid.<br>' +
+        'Harvest <span style="color:' + COL.magenta + '">data nodes</span>, ' +
+        'avoid the firewall walls and your own tail.</p>';
+      ovPrompt.textContent = 'PRESS [ENTER] OR AN ARROW KEY';
+      setStatus('awaiting neural link...');
+    } else if (kind === 'paused') {
+      ovTitle.textContent = 'SIGNAL PAUSED';
+      ovTitle.setAttribute('data-text', 'SIGNAL PAUSED');
+      ovTitle.classList.remove('danger');
+      ovBody.innerHTML = '<p>Stream suspended.<br>Buffered state preserved.</p>';
+      ovPrompt.textContent = 'PRESS [SPACE] TO RESUME';
+      setStatus('stream paused by operator...');
+    } else { // over
+      ovTitle.textContent = 'CONNECTION TERMINATED';
+      ovTitle.setAttribute('data-text', 'CONNECTION TERMINATED');
+      ovTitle.classList.add('danger');
+      ovBody.innerHTML =
+        '<div class="score-line">SCORE <b>' + pad(score) + '</b>' +
+        'HIGH <b class="mag">' + pad(Math.max(high, score)) + '</b></div>' +
+        '<p>' + (score >= high && score > 0
+                  ? '<span style="color:' + COL.magenta + '">NEW RECORD WRITTEN TO LOCAL STORAGE</span>'
+                  : 'trace recovered from last successful run') + '</p>';
+      ovPrompt.textContent = 'PRESS [ENTER] TO REBOOT';
+      setStatus('connection terminated — reboot required');
+    }
+  }
+  const hideOverlay = () => overlay.classList.add('hidden');
+
+  /* ========================== GAME LOGIC ================================ */
+
+  function reset() {
+    const cy = Math.floor(GRID / 2);
+    snake = [
+      { x: 6, y: cy },
+      { x: 5, y: cy },
+      { x: 4, y: cy }
+    ];
+    prevTail = { x: 4, y: cy };   // same as the real tail → no drift at boot
+    dir = { x: 1, y: 0 };
+    dirQueue = [];
+    hasStepped = false;
+    score = 0; level = 1; foodsEaten = 0; tickMs = BASE_TICK;
+    particles = []; waves = []; floats = [];
+    shake = 0; flash = 0; acc = 0;
+    spawnFood();
+    updateHUD();
+  }
+
+  function spawnFood() {
+    const free = [];
+    for (let y = 0; y < GRID; y++) {
+      for (let x = 0; x < GRID; x++) {
+        let onSnake = false;
+        for (let i = 0; i < snake.length; i++) {
+          if (snake[i].x === x && snake[i].y === y) { onSnake = true; break; }
+        }
+        if (!onSnake) free.push({ x, y });
+      }
+    }
+    food = free.length ? free[(Math.random() * free.length) | 0] : null;
+    if (!food) win();               // board completely full → victory
+  }
+
+  function startGame() {
+    reset();
+    state = 'playing';
+    hideOverlay();
+    sStart();
+    setStatus('linked — collecting data nodes...');
+  }
+
+  function togglePause() {
+    if (state === 'playing') {
+      state = 'paused';
+      showOverlay('paused');
+    } else if (state === 'paused') {
+      state = 'playing';
+      hideOverlay();
+      setStatus('stream resumed...');
+    }
+  }
+
+  /* Advance one simulation step. */
+  function step() {
+    // apply the next valid buffered direction
+    while (dirQueue.length) {
+      const d = dirQueue.shift();
+      if (!(d.x === -dir.x && d.y === -dir.y)) { dir = d; break; }
+    }
+
+    const head = snake[0];
+    const nx = head.x + dir.x;
+    const ny = head.y + dir.y;
+
+    // 1) firewall (walls) → fatal
+    if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) { die('FIREWALL IMPACT'); return; }
+
+    // 2) will we grow this tick? (decides whether the tail vacates a cell)
+    const willGrow = !!food && nx === food.x && ny === food.y;
+    const limit = willGrow ? snake.length : snake.length - 1;
+
+    for (let i = 0; i < limit; i++) {
+      if (snake[i].x === nx && snake[i].y === ny) { die('SELF-COLLISION'); return; }
+    }
+
+    // 3) move
+    prevTail = { x: snake[snake.length - 1].x, y: snake[snake.length - 1].y };
+    snake.unshift({ x: nx, y: ny });
+    if (!willGrow) snake.pop(); else eat({ x: nx, y: ny });
+    hasStepped = true;
+  }
+
+  function eat(cellPos) {
+    foodsEaten++;
+    score += 10 * level;
+    sEat();
+
+    // FX: sparks + shockwave + floating points
+    burst(cellPos.x, cellPos.y, COL.magenta, 20);
+    burst(cellPos.x, cellPos.y, COL.cyan, 10);
+    waves.push({ x: cellPos.x, y: cellPos.y, r: 0, a: 1 });
+    floats.push({ x: cellPos.x, y: cellPos.y, txt: '+' + (10 * level), a: 1 });
+
+    // difficulty ramp: level up every N nodes → faster tick
+    const newLevel = 1 + Math.floor(foodsEaten / FOODS_PER_LVL);
+    if (newLevel > level) {
+      level = newLevel;
+      tickMs = Math.max(MIN_TICK, BASE_TICK - (level - 1) * TICK_DECAY);
+      sLevel();
+      flash = Math.max(flash, 0.45);
+      floats.push({ x: GRID / 2, y: GRID / 2, txt: 'LEVEL ' + level, a: 1, big: true });
+      setStatus('throughput increased — level ' + level);
+    }
+
+    spawnFood();
+    updateHUD();
+  }
+
+  function die(reason) {
+    state = 'over';
+    shake = 1;
+    flash = 1;
+    sDie();
+
+    // shred the construct into sparks
+    for (let i = 0; i < snake.length; i += 2) burst(snake[i].x, snake[i].y, COL.green, 4);
+    boardEl.classList.remove('dying');
+    void boardEl.offsetWidth;                   // restart CSS animation
+    boardEl.classList.add('dying');
+
+    if (score > high) { high = score; saveHigh(high); }
+    updateHUD();
+    setStatus(reason.toLowerCase() + ' at [' + snake[0].x + ',' + snake[0].y + ']');
+
+    setTimeout(() => { if (state === 'over') showOverlay('over'); }, 700);
+  }
+
+  function win() {
+    state = 'over';
+    score += 500;
+    updateHUD();
+    showOverlay('over');
+  }
+
+  /* ------------------------------- FX ---------------------------------- */
+  function burst(gx, gy, color, n) {
+    const cx = (gx + 0.5) * cell, cy = (gy + 0.5) * cell;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 40 + Math.random() * 190;
+      particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 1, size: 1.5 + Math.random() * 2.5,
+        color: color
+      });
+    }
+  }
+
+  function updateFX(dt) {
+    const s = dt / 1000;
+    if (shake > 0) shake = Math.max(0, shake - dt / 450);
+    if (flash > 0) flash = Math.max(0, flash - dt / 380);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * s; p.y += p.vy * s;
+      p.vx *= 0.94; p.vy *= 0.94;
+      p.life -= dt / 700;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i];
+      w.r += cell * 5.5 * s;
+      w.a -= dt / 480;
+      if (w.a <= 0) waves.splice(i, 1);
+    }
+    for (let i = floats.length - 1; i >= 0; i--) {
+      const f = floats[i];
+      f.y -= dt / 900;
+      f.a -= dt / 950;
+      if (f.a <= 0) floats.splice(i, 1);
+    }
+
+    // rotate the status line every few seconds
+    statusTimer += dt;
+    if (statusTimer > 5200 && state === 'playing') {
+      setStatus(STATUS[(Math.random() * STATUS.length) | 0]);
+    }
+  }
+
+  /* =========================== RENDERING ================================ */
+
+  function resize() {
+    const rect = boardEl.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    viewW = rect.width;
+    cell = viewW / GRID;
+    gameCanvas.width  = Math.round(viewW * dpr);
+    gameCanvas.height = Math.round(viewW * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  /* Build the smooth polyline of the snake for the current frame.
+     Head slides from its previous cell to its new one; the tail tip slides
+     out of the vacated cell. Joints stay fixed → perfectly smooth motion. */
+  function snakePath(alpha) {
+    const pts = snake.map(c => ({ x: (c.x + 0.5) * cell, y: (c.y + 0.5) * cell }));
+    if (!pts.length) return pts;
+    if (!hasStepped) return pts;   // nothing has moved yet → hold position
+
+    const behind = pts[1] || (prevTail ? { x: (prevTail.x + .5) * cell, y: (prevTail.y + .5) * cell } : pts[0]);
+    const head = {
+      x: lerp(behind.x, pts[0].x, alpha),
+      y: lerp(behind.y, pts[0].y, alpha)
+    };
+    const last = pts[pts.length - 1];
+    const oldTail = prevTail ? { x: (prevTail.x + .5) * cell, y: (prevTail.y + .5) * cell } : last;
+    const tail = { x: lerp(oldTail.x, last.x, alpha), y: lerp(oldTail.y, last.y, alpha) };
+
+    return [head].concat(pts.slice(1, -1), [tail]);
+  }
+
+  function drawGrid() {
+    g.save();
+    g.strokeStyle = 'rgba(57,255,136,0.055)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let i = 1; i < GRID; i++) {
+      const p = Math.round(i * cell) + 0.5;
+      g.moveTo(p, 0); g.lineTo(p, viewW);
+      g.moveTo(0, p); g.lineTo(viewW, p);
+    }
+    g.stroke();
+
+    // brighter frame inset
+    g.strokeStyle = 'rgba(0,240,255,0.22)';
+    g.lineWidth = 2;
+    g.strokeRect(1, 1, viewW - 2, viewW - 2);
+    g.restore();
+  }
+
+  function drawFood(t) {
+    if (!food) return;
+    const cx = (food.x + 0.5) * cell, cy = (food.y + 0.5) * cell;
+    const pulse = 0.78 + 0.22 * Math.sin(t * 6);
+    const r = cell * 0.34 * pulse;
+
+    g.save();
+    g.translate(cx, cy);
+
+    // rotating magenta frame
+    g.save();
+    g.rotate(t * 1.6);
+    g.shadowColor = COL.magenta; g.shadowBlur = 16 * pulse;
+    g.strokeStyle = COL.magenta; g.lineWidth = 2;
+    g.strokeRect(-r, -r, r * 2, r * 2);
+    g.restore();
+
+    // orbiting satellites
+    for (let i = 0; i < 4; i++) {
+      const a = t * 2.4 + i * Math.PI / 2;
+      g.fillStyle = COL.cyan;
+      g.shadowColor = COL.cyan; g.shadowBlur = 8;
+      g.beginPath();
+      g.arc(Math.cos(a) * cell * 0.44, Math.sin(a) * cell * 0.44, 1.6, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // hot core
+    g.shadowColor = '#ff9bf0'; g.shadowBlur = 18;
+    g.fillStyle = '#ffd7f6';
+    g.beginPath();
+    g.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+
+  function drawSnake(alpha, t) {
+    const pts = snakePath(alpha);
+    if (pts.length < 2) return;
+
+    const trace = () => {
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+    };
+
+    g.save();
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+
+    // outer glow layer
+    g.strokeStyle = 'rgba(0,240,255,0.35)';
+    g.lineWidth = cell * 0.95;
+    g.shadowColor = COL.green; g.shadowBlur = cell * 0.75;
+    trace(); g.stroke();
+
+    // main body
+    g.shadowBlur = cell * 0.5;
+    g.strokeStyle = COL.green;
+    g.lineWidth = cell * 0.76;
+    trace(); g.stroke();
+
+    // bright inner core
+    g.shadowBlur = 6;
+    g.strokeStyle = 'rgba(182,255,217,0.85)';
+    g.lineWidth = cell * 0.26;
+    trace(); g.stroke();
+    g.restore();
+
+    // ---- head ----
+    const h = pts[0];
+    g.save();
+    g.translate(h.x, h.y);
+    g.shadowColor = COL.cyan; g.shadowBlur = 18;
+    g.fillStyle = '#0cffb0';
+    const hs = cell * 0.86;
+    roundRect(g, -hs / 2, -hs / 2, hs, hs, cell * 0.24);
+    g.fill();
+
+    // eyes, oriented opposite the travel direction
+    g.shadowBlur = 0;
+    g.fillStyle = '#02120c';
+    const ex = -dir.x * cell * 0.16, ey = -dir.y * cell * 0.16;
+    const px = -dir.y * cell * 0.19, py = dir.x * cell * 0.19;
+    const er = Math.max(1.6, cell * 0.11);
+    g.beginPath(); g.arc(ex + px, ey + py, er, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(ex - px, ey - py, er, 0, Math.PI * 2); g.fill();
+
+    // visor glint
+    g.fillStyle = 'rgba(255,255,255,' + (0.25 + 0.15 * Math.sin(t * 8)) + ')';
+    g.fillRect(-hs / 2, -hs / 2, hs, hs * 0.22);
+    g.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawFX() {
+    // shockwaves
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    for (const w of waves) {
+      g.strokeStyle = 'rgba(0,240,255,' + Math.max(0, w.a) * 0.7 + ')';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc((w.x + .5) * cell, (w.y + .5) * cell, w.r, 0, Math.PI * 2);
+      g.stroke();
+    }
+    // sparks
+    for (const p of particles) {
+      g.globalAlpha = Math.max(0, p.life);
+      g.fillStyle = p.color;
+      g.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    g.restore();
+
+    // floating text
+    g.save();
+    g.textAlign = 'center';
+    for (const f of floats) {
+      g.globalAlpha = Math.max(0, f.a);
+      g.font = '700 ' + (f.big ? cell * 0.9 : cell * 0.6) + 'px "Lucida Console", monospace';
+      g.fillStyle = f.big ? COL.cyan : COL.greenHot;
+      g.shadowColor = f.big ? COL.cyan : COL.green;
+      g.shadowBlur = 12;
+      g.fillText(f.txt, (f.x + .5) * cell, (f.y + .5) * cell);
+    }
+    g.restore();
+  }
+
+  function drawGame(alpha, t) {
+    g.clearRect(0, 0, viewW, viewW);
+
+    // board backdrop
+    g.fillStyle = 'rgba(0, 12, 9, 0.94)';
+    g.fillRect(0, 0, viewW, viewW);
+
+    g.save();
+    if (shake > 0) {
+      const s = shake * shake * 9;
+      g.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    }
+
+    drawGrid();
+    drawFood(t);
+    drawSnake(alpha, t);
+    drawFX();
+    g.restore();
+
+    // damage flash
+    if (flash > 0) {
+      g.fillStyle = 'rgba(255, 60, 90,' + flash * 0.30 + ')';
+      g.fillRect(0, 0, viewW, viewW);
+    }
+  }
+
+  /* ============================== INPUT ================================= */
+  const KEYMAP = {
+    ArrowUp: 'up',    w: 'up',    W: 'up',
+    ArrowDown: 'down', s: 'down', S: 'down',
+    ArrowLeft: 'left', a: 'left', A: 'left',
+    ArrowRight: 'right', d: 'right', D: 'right'
+  };
+  const VEC = {
+    up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
+  };
+
+  function queueDir(name) {
+    if (dirQueue.length < 3) dirQueue.push(VEC[name]);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key;
+    const action = KEYMAP[k];
+
+    // stop the page scrolling with arrows / space
+    if (k === ' ' || k.indexOf('Arrow') === 0) e.preventDefault();
+
+    if (action) {
+      if (state === 'menu' || state === 'over') { startGame(); }
+      if (state === 'playing') queueDir(action);
+      return;
+    }
+
+    switch (k) {
+      case 'Enter':
+        if (state === 'menu' || state === 'over') startGame();
+        break;
+      case ' ':
+      case 'p': case 'P':
+        if (state === 'playing' || state === 'paused') togglePause();
+        else startGame();
+        break;
+      case 'r': case 'R':
+        startGame();
+        break;
+      case 'm': case 'M':
+        muted = !muted;
+        setStatus(muted ? 'audio muted' : 'audio online');
+        if (!muted) beep(500, 800, 0.08, 'square', 0.05);
+        break;
+    }
+  });
+
+  /* touch / swipe support (progressive enhancement) */
+  let touchStart = null;
+  boardEl.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+
+  boardEl.addEventListener('touchend', (e) => {
+    if (!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {      // tap
+      if (state === 'menu' || state === 'over') startGame();
+      else togglePause();
+      return;
+    }
+    const name = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? 'right' : 'left')
+      : (dy > 0 ? 'down' : 'up');
+    if (state === 'menu' || state === 'over') startGame();
+    if (state === 'playing') queueDir(name);
+  }, { passive: true });
+
+  /* auto-pause when the tab loses focus */
+  window.addEventListener('blur', () => {
+    if (state === 'playing') togglePause();
+  });
+
+  /* --------------------------- random glitching ------------------------- */
+  (function scheduleGlitch() {
+    const wait = 3500 + Math.random() * 6500;
+    setTimeout(() => {
+      document.body.classList.add('glitch');
+      setTimeout(() => document.body.classList.remove('glitch'), 320);
+      scheduleGlitch();
+    }, wait);
+  })();
+
+  /* ============================ MAIN LOOP =============================== */
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(ts - lastTs, 100);   // clamp after tab switches
+    lastTs = ts;
+
+    rainDraw(dt);
+
+    if (state === 'playing') {
+      acc += dt;
+      let guard = 0;
+      while (acc >= tickMs && state === 'playing' && guard++ < 6) {
+        acc -= tickMs;
+        step();
+      }
+      alpha = acc / tickMs;
+    } else {
+      alpha = 1;
+    }
+
+    updateFX(dt);
+    drawGame(alpha, ts / 1000);
+  }
+
+  /* ============================== BOOT ================================== */
+  function init() {
+    rainResize();
+    resize();
+    reset();
+    showOverlay('menu');
+    updateHUD();
+    requestAnimationFrame((ts) => { lastTs = ts; frame(ts); });
+  }
+
+  window.addEventListener('resize', () => { rainResize(); resize(); });
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(boardEl);
+
+  init();
+})();
+</script>
+</body>
+</html>

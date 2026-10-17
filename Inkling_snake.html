@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON SNAKE // CYBER MATRIX</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --neon-green: #00ff88;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff00aa;
+  --bg: #050a0f;
+  --surface: #0a1220;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--neon-green);
+  overflow: hidden;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* Matrix rain canvas behind everything */
+#matrix-canvas {
+  position: fixed; inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Glitch overlay lines */
+.scanlines {
+  position: fixed; inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 255, 136, 0.03) 2px,
+    rgba(0, 255, 136, 0.03) 4px
+  );
+  animation: scanMove 8s linear infinite;
+}
+@keyframes scanMove {
+  from { background-position: 0 0; }
+  to { background-position: 0 100vh; }
+}
+
+/* Main UI */
+.ui-layer {
+  position: relative;
+  z-index: 10;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100vh; padding: 2rem;
+  text-align: center;
+}
+
+.glow-text {
+  font-family: 'Orbitron', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 20px var(--neon-green), 0 0 40px rgba(0, 255, 136, 0.5);
+}
+
+h1 {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  margin-bottom: 0.5rem;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 20px var(--neon-cyan), 0 0 60px rgba(0, 240, 255, 0.6);
+  animation: glitchText 3s infinite;
+}
+
+@keyframes glitchText {
+  0%, 100% { text-shadow: 0 0 20px var(--neon-cyan), 0 0 60px rgba(0,240,255,0.6); transform: translate(0); }
+  20% { text-shadow: -2px 0 20px var(--neon-magenta), 2px 0 20px var(--neon-cyan); transform: translate(2px, -1px); }
+  40% { text-shadow: 2px 1px 20px var(--neon-cyan), -1px -2px 20px var(--neon-green); transform: translate(-2px, 1px); }
+  60% { text-shadow: 1px -1px 20px var(--neon-magenta), -2px 2px 20px var(--neon-green); }
+  80% { text-shadow: -1px 2px 20px var(--neon-cyan), 2px -1px 20px var(--neon-green); }
+}
+
+.subtitle {
+  font-size: 1rem; color: var(--neon-green);
+  margin-bottom: 2rem; opacity: 0.9; letter-spacing: 0.1em;
+}
+
+/* Score / HUD */
+.hud {
+  position: absolute; top: 1.5rem; left: 1.5rem; right: 1.5rem;
+  z-index: 15; display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none;
+}
+.hud .stat {
+  background: rgba(5, 10, 15, 0.7); border: 1px solid var(--neon-green);
+  padding: 0.6rem 1.2rem; border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0,255,136,0.2);
+  backdrop-filter: blur(4px);
+}
+.stat-label { font-size: 0.7rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-family: 'Orbitron', sans-serif; font-size: 1.3rem; font-weight: 700; }
+
+/* Game board */
+#game-board {
+  position: relative; z-index: 10;
+  border: 2px solid var(--neon-cyan);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.3), inset 0 0 40px rgba(0, 255, 136, 0.05);
+  border-radius: 8px; overflow: hidden;
+  background: rgba(10, 18, 32, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+canvas { display: block; }
+
+/* Start / Game Over overlay */
+.overlay {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(5, 10, 15, 0.85); backdrop-filter: blur(8px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 8px; transition: opacity 0.3s ease;
+}
+.overlay.hidden { opacity: 0; pointer-events: none; }
+
+.btn {
+  margin-top: 2rem; padding: 1rem 2.5rem;
+  font-family: 'Orbitron', sans-serif; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.15em;
+  background: transparent; color: var(--neon-green); border: 2px solid var(--neon-green);
+  border-radius: 4px; cursor: pointer; transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(0,255,136,0.3);
+}
+.btn:hover {
+  background: var(--neon-green); color: var(--bg);
+  box-shadow: 0 0 30px rgba(0,255,136,0.6);
+}
+
+/* Terminal-style footer */
+.footer-note {
+  margin-top: 1rem; font-size: 0.75rem; opacity: 0.5; letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+
+<!-- Digital rain background -->
+<canvas id="matrix-canvas"></canvas>
+<div class="scanlines"></div>
+
+<div class="ui-layer" id="main-ui">
+
+  <div class="hud">
+    <div class="stat">
+      <div class="stat-label">Score</div>
+      <div class="stat-value" id="score-display">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">High Score</div>
+      <div class="stat-value" id="high-display">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Level</div>
+      <div class="stat-value" id="level-display">1</div>
+    </div>
+  </div>
+
+  <h1>NEON SNAKE</h1>
+  <p class="subtitle">// ENTER THE MATRIX // ARROW KEYS / WASD //</p>
+
+  <div style="position:relative; width: 640px; max-width: 90vw;">
+    <div id="game-board">
+      <canvas id="game-canvas" width="640" height="640"></canvas>
+
+      <div id="start-overlay" class="overlay">
+        <h2 style="font-family:'Orbitron',sans-serif; font-size:2rem; color:var(--neon-cyan); text-shadow:0 0 20px var(--neon-cyan);">SYSTEM READY</h2>
+        <p style="margin-top:0.5rem; opacity:0.8;">Consume data. Avoid collision.</p>
+        <button class="btn" onclick="startGame()" id="start-btn">INITIATE</button>
+      </div>
+
+      <div id="gameover-overlay" class="overlay hidden">
+        <h2 style="font-family:'Orbitron',sans-serif; font-size:2.5rem; color:var(--neon-magenta); text-shadow:0 0 20px var(--neon-magenta);">SYSTEM FAILURE</h2>
+        <p style="margin-top:0.5rem; opacity:0.8;">Final Score: <strong id="final-score">0</strong></p>
+        <button class="btn" onclick="startGame()" id="restart-btn">REBOOT SYSTEM</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">[ LOCAL STORAGE ACTIVE ] HIGH SCORE SAVED LOCALLY</p>
+</div>
+
+<script>
+/* ============================================================
+   NEON SNAKE // CYBER MATRIX
+   Complete single-file Snake game with Matrix digital rain
+   ============================================================ */
+
+// Canvas refs
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const matrixCanvas = document.getElementById('matrix-canvas');
+const mCtx = matrixCanvas.getContext('2d');
+
+// Game settings
+const COLS = 20; const ROWS = 20;
+const CELL = canvas.width / COLS; // 32px
+
+// State
+let snake = []; let dir = { x: 1, y: 0 }; let nextDir = { x: 1, y: 0 };
+let food = { x: 10, y: 10 };
+let score = 0; let highScore = parseInt(localStorage.getItem('snake_high_score') || '0', 10);
+let level = 1; let running = false; let tickRate = 150; let frame = 0;
+
+// Initialize UI
+updateHUD();
+
+/* ---------------- Matrix Rain Background ---------------- */
+function resizeMatrix() {
+  matrixCanvas.width = window.innerWidth;
+  matrixCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeMatrix);
+resizeMatrix();
+
+const chars = '0123456789ABCDEF';
+const drops = Array(Math.floor(window.innerWidth / 14)).fill(0).map(() => Math.random() * window.innerHeight);
+
+function drawMatrixRain() {
+  mCtx.fillStyle = 'rgba(5, 10, 15, 0.08)';
+  mCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+
+  mCtx.font = '14px Share Tech Mono';
+  for (let i = 0; i < drops.length; i++) {
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    const x = i * 14;
+    const y = drops[i] * 14;
+    mCtx.fillStyle = (i % 3 === 0) ? '#00ff88' : (i % 3 === 1) ? '#00f0ff' : '#ff00aa';
+    mCtx.fillText(text, x, y);
+    if (y > matrixCanvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i] += 1;
+  }
+  requestAnimationFrame(drawMatrixRain);
+}
+drawMatrixRain();
+
+/* ---------------- Game Logic ---------------- */
+function resetGame() {
+  snake = [
+    { x: 4, y: 10 },
+    { x: 3, y: 10 },
+    { x: 2, y: 10 }
+  ];
+  dir = { x: 1, y: 0 };
+  nextDir = { x: 1, y: 0 };
+  score = 0; level = 1; tickRate = 150;
+  spawnFood();
+  updateHUD();
+}
+
+function spawnFood() {
+  let valid = false;
+  while (!valid) {
+    food.x = Math.floor(Math.random() * COLS);
+    food.y = Math.floor(Math.random() * ROWS);
+    valid = true;
+    for (let s of snake) {
+      if (s.x === food.x && s.y === food.y) { valid = false; break; }
+    }
+  }
+}
+
+function updateHUD() {
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('high-display').textContent = highScore;
+  document.getElementById('level-display').textContent = level;
+}
+
+function gameLoop(timestamp) {
+  if (!running) return;
+
+  frame++;
+  // Move on tick
+  if (frame % Math.floor(tickRate / 16) === 0) {
+    dir = nextDir;
+
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // Wall collision
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+      endGame();
+      return;
+    }
+    // Self collision
+    for (let s of snake) {
+      if (head.x === s.x && head.y === s.y) {
+        endGame();
+        return;
+      }
+    }
+
+    snake.unshift(head);
+
+    // Eat food
+    if (head.x === food.x && head.y === food.y) {
+      score += 10 * level;
+      level = Math.floor(score / 50) + 1;
+      tickRate = Math.max(40, 150 - level * 10);
+      spawnFood();
+    } else {
+      snake.pop();
+    }
+
+    updateHUD();
+  }
+
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function draw() {
+  // Clear with faint grid
+  ctx.fillStyle = '#050a14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= COLS; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * CELL, 0);
+    ctx.lineTo(i * CELL, canvas.height);
+    ctx.stroke();
+  }
+  for (let i = 0; i <= ROWS; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, i * CELL);
+    ctx.lineTo(canvas.width, i * CELL);
+    ctx.stroke();
+  }
+
+  // Draw food (pulsing glow)
+  const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
+  const glow = 8 + pulse * 10;
+  ctx.shadowColor = '#ff00aa';
+  ctx.shadowBlur = glow;
+  ctx.fillStyle = '#ff00aa';
+  ctx.beginPath();
+  ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Draw snake
+  for (let i = 0; i < snake.length; i++) {
+    const s = snake[i];
+    const isHead = i === 0;
+    ctx.fillStyle = isHead ? '#00f0ff' : '#00ff88';
+    if (isHead) {
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 15;
+    } else {
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = 8;
+    }
+    ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2);
+    // Inner highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(s.x * CELL + 6, s.y * CELL + 6, CELL - 12, CELL - 12);
+    ctx.shadowBlur = 0;
+  }
+}
+
+function startGame() {
+  resetGame();
+  running = true;
+  document.getElementById('start-overlay').classList.add('hidden');
+  document.getElementById('gameover-overlay').classList.add('hidden');
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  running = false;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('snake_high_score', String(highScore));
+  }
+  updateHUD();
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('gameover-overlay').classList.remove('hidden');
+}
+
+/* ---------------- Controls ---------------- */
+document.addEventListener('keydown', (e) => {
+  if (!running || document.getElementById('start-overlay').classList.contains('hidden') === false) {
+    // Allow space to start/restart
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (!running) startGame();
+    }
+    return;
+  }
+  const key = e.key.toLowerCase();
+  const valid = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', w: 'w', a: 'a', s: 's', d: 'd' };
+  if (!valid[key]) return;
+  e.preventDefault();
+  let nx = nextDir.x, ny = nextDir.y;
+  switch (key) {
+    case 'arrowup': case 'w': if (dir.y === 0) { nx = 0; ny = -1; } break;
+    case 'arrowdown': case 's': if (dir.y === 0) { nx = 0; ny = 1; } break;
+    case 'arrowleft': case 'a': if (dir.x === 0) { nx = -1; ny = 0; } break;
+    case 'arrowright': case 'd': if (dir.x === 0) { nx = 1; ny = 0; } break;
+  }
+  nextDir = { x: nx, y: ny };
+});
+
+// Initial draw of board (static)
+draw();
+</script>
+</body>
+</html>
