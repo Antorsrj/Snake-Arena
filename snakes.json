@@ -236,5 +236,11 @@
     "counter": "ternary-bonsai",
     "added": "2026-10-06",
     "warn": "did not work after 1 prompt iteration"
+  },
+  {
+    "file": "Flint-40B-A2.5B_snake.html",
+    "model": "Flint 40B A2.5B",
+    "counter": "flint-40b-a2-5b",
+    "added": "2026-10-22"
   }
 ]
